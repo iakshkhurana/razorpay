@@ -32,7 +32,6 @@ type MenuEntry = { key: PanelKey; labelKey: CommonKey; kind: "panel" } | { key: 
 
 const MENU: readonly MenuEntry[] = [
   { key: "product", labelKey: "nav.product", kind: "panel" },
-  { key: "solutions", labelKey: "nav.solutions", kind: "panel" },
   { key: "developers", labelKey: "nav.developers", kind: "link", href: "/developers" },
   { key: "pricing", labelKey: "nav.pricing", kind: "link", href: "/pricing" },
   { key: "evidence", labelKey: "nav.evidence", kind: "link", href: "/eval" },
@@ -513,14 +512,10 @@ export function MarketingNav({ className }: MarketingNavProps) {
           </nav>
         </div>
 
-        {/* centre: the live pill, inline in the bar */}
-        <div className="hidden h-full items-center justify-center lg:flex">
-          <TestModePill tone="light" payments={payments} />
-        </div>
+        <div className="hidden lg:block" aria-hidden="true" />
 
         {/* right: language + CTA + menu button */}
         <div className="flex items-center justify-end gap-2">
-          <TestModePill tone="light" payments={payments} className="hidden sm:inline-flex lg:hidden" />
           <LanguageToggle size="compact" className="hidden sm:inline-grid" />
           <Link href="/dashboard" className={buttonClasses({ variant: "pill", size: "sm", className: "hidden h-9 md:inline-flex" })}>
             {t("nav.openTower")}
