@@ -1,6 +1,8 @@
 "use client";
 
-import type { ChatMessage, Order, Policy, Sku, Verdict, VerdictEvent } from "../schemas";
+import type { ChatMessage, Lang, Order, Policy, Sku, Verdict, VerdictEvent } from "../schemas";
+
+export type { Lang };
 
 /**
  * Typed browser client for the AgentGate API. Every page talks to the server
@@ -162,6 +164,16 @@ export interface BuyerTurnResponse {
   mode: "openai" | "fallback";
 }
 
+/** The spoken day summary: `text` is the primary in `lang`; both languages always come back. */
+export interface SummaryResponse {
+  ok: true;
+  lang: Lang;
+  text: string;
+  hi: string;
+  en: string;
+  source: "openai" | "fallback";
+}
+
 /* ------------------------------------------------------------------ */
 /*  Calls                                                              */
 /* ------------------------------------------------------------------ */
@@ -177,7 +189,8 @@ export const api = {
 
   issueMandate: (body: { spend_cap_paise: number; category_scope?: string[]; agent_id?: string; user_ref?: string; ttl_seconds?: number }) =>
     post<IssueMandateResponse>("/api/mandate/issue", body),
-  negotiate: (body: { mandate_token: string; message: string; session_id?: string }) => post<NegotiateResponse>("/api/agent/negotiate", body),
+  /** `lang` sets the seller's language on the model path (default "en"); the scripted fallback answers in English. */
+  negotiate: (body: { mandate_token: string; message: string; session_id?: string; lang?: Lang }) => post<NegotiateResponse>("/api/agent/negotiate", body),
   checkout: async (body: { mandate_token: string; offer_id: string }): Promise<CheckoutResponse> => {
     try {
       return await post<CheckoutResponse>("/api/agent/checkout", body);
@@ -196,8 +209,11 @@ export const api = {
     post<{ ok: true; duplicate: boolean; order: OrderView }>("/api/dev/simulate-webhook", body),
 
   demoGoals: () => call<{ ok: true; goals: DemoGoalView[] }>("/api/simulator/buyer"),
-  buyerNext: (body: { goal_key: DemoGoalView["key"]; transcript: ChatMessage[]; last_events: VerdictEvent[]; turn: number; order_placed: boolean }) =>
+  buyerNext: (body: { goal_key: DemoGoalView["key"]; transcript: ChatMessage[]; last_events: VerdictEvent[]; turn: number; order_placed: boolean; lang?: Lang }) =>
     post<BuyerTurnResponse>("/api/simulator/buyer", body),
+
+  /** Day summary for the voice button. `lang` picks the primary text; pass it straight to `speak(res.text)`. */
+  summary: (lang: Lang = "en") => call<SummaryResponse>(`/api/summary?lang=${lang}`),
 
   /** Server-side speech (Sarvam). Resolves null when the server has no provider (404) — speak with the browser instead. */
   tts: async (text: string, lang: TtsLang, speaker?: string): Promise<Blob | null> => {
@@ -237,6 +253,8 @@ export async function runScriptedOrder(input: {
   cap_paise: number;
   lines: string[];
   category_scope?: string[];
+  /** language of the seller's model-path replies (default "en") */
+  lang?: Lang;
   onTurn?: (turn: { buyer: string; reply: string; events: VerdictEvent[] }) => void;
 }): Promise<ScriptedOrderResult> {
   const issued = await api.issueMandate({ spend_cap_paise: input.cap_paise, category_scope: input.category_scope ?? ["handloom", "gifts"] });
@@ -246,7 +264,7 @@ export async function runScriptedOrder(input: {
   let order: Order | null = null;
 
   for (const line of input.lines) {
-    const res = await api.negotiate({ mandate_token: issued.token, message: line, session_id });
+    const res = await api.negotiate({ mandate_token: issued.token, message: line, session_id, lang: input.lang });
     session_id = res.session_id;
     transcript.push({ role: "buyer", content: line }, { role: "seller", content: res.reply });
     events.push(...res.events);

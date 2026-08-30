@@ -1,7 +1,7 @@
 import { formatINR } from "../money";
-import type { ChatMessage, VerdictEvent } from "../schemas";
+import type { ChatMessage, Lang, VerdictEvent } from "../schemas";
 import { chatText, llmMode } from "./router";
-import { cleanReply } from "./seller";
+import { cleanReply, languageRule } from "./seller";
 
 /**
  * The buyer simulator. A scripted buyer drives the three demo goals offline;
@@ -101,8 +101,12 @@ export function scriptedBuyerNext(state: BuyerState): BuyerDecision {
   return { message: "Could you suggest something that fits my budget?", done: false, reason: "nudge" };
 }
 
-/** LLM buyer under the verbatim prompt; falls back to the script when the model is unavailable. */
-export async function buyerNext(state: BuyerState, user_ref = "priya@example.com"): Promise<BuyerDecision & { mode: "openai" | "fallback" }> {
+/**
+ * LLM buyer under the verbatim prompt; falls back to the script when the model
+ * is unavailable. `lang` sets the model reply's language (Hindi in Devanagari);
+ * the scripted lines are English in both modes.
+ */
+export async function buyerNext(state: BuyerState, user_ref = "priya@example.com", lang: Lang = "en"): Promise<BuyerDecision & { mode: "openai" | "fallback" }> {
   const scripted = scriptedBuyerNext(state);
   if (scripted.done || llmMode() !== "openai") return { ...scripted, mode: "fallback" };
 
@@ -119,7 +123,7 @@ export async function buyerNext(state: BuyerState, user_ref = "priya@example.com
   }
   if (messages.length === 0) messages.push({ role: "user", content: "The seller is ready. Say what you are looking for." });
 
-  const text = await chatText({ model: "light", system: `${system}\nPlain text only — no markdown, no lists.`, messages, temperature: 0, max_tokens: 120 });
+  const text = await chatText({ model: "light", system: `${system}\nPlain text only — no markdown, no lists.\n${languageRule(lang)}`, messages, temperature: 0, max_tokens: 120 });
   const cleaned = text ? cleanReply(text) : "";
   if (!cleaned) return { ...scripted, mode: "fallback" };
   return { message: cleaned, done: false, reason: "model", mode: "openai" };

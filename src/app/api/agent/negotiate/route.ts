@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   if (!mandate.ok) return mandate.response;
 
   const session = loadSession(body.data.session_id, mandate.claims.mandate_id);
-  const result = await sellerTurn({ session, mandate: mandate.claims, message: body.data.message, now: mandate.now });
+  const result = await sellerTurn({ session, mandate: mandate.claims, message: body.data.message, now: mandate.now, lang: body.data.lang });
 
   return json({
     ok: true,

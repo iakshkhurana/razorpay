@@ -278,10 +278,18 @@ export const ChatMessageSchema = z.object({
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
+/**
+ * The language the agents speak on the model path. Hindi is always Devanagari;
+ * the deterministic fallbacks stay English. Mirrors `Locale` in lib/i18n/core.
+ */
+export const LangSchema = z.enum(["en", "hi"]);
+export type Lang = z.infer<typeof LangSchema>;
+
 export const NegotiateRequestSchema = z.object({
   mandate_token: z.string().min(1),
   session_id: z.string().min(1).optional(),
   message: z.string().min(1),
+  lang: LangSchema.default("en"),
 });
 export type NegotiateRequest = z.infer<typeof NegotiateRequestSchema>;
 

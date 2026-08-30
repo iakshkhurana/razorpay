@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { error, json, parseBody } from "@/lib/api";
 import { buyerNext, DEMO_GOALS } from "@/lib/llm/buyer";
-import { ChatMessageSchema, VerdictEventSchema } from "@/lib/schemas";
+import { ChatMessageSchema, LangSchema, VerdictEventSchema } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,8 @@ const BuyerTurnSchema = z.object({
   turn: z.number().int().nonnegative().default(0),
   order_placed: z.boolean().default(false),
   user_ref: z.string().min(1).default("priya@example.com"),
+  /** language of the model-path line; scripted lines stay English */
+  lang: LangSchema.default("en"),
 });
 
 export async function GET() {
@@ -28,6 +30,7 @@ export async function POST(req: Request) {
   const decision = await buyerNext(
     { goal, transcript: body.data.transcript, last_events: body.data.last_events, turn: body.data.turn, order_placed: body.data.order_placed },
     body.data.user_ref,
+    body.data.lang,
   );
   return json({ ok: true, ...decision });
 }
