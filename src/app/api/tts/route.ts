@@ -56,8 +56,8 @@ export async function POST(req: Request) {
   const { text, lang, speaker } = body.data;
   const settings = {
     target_language_code: lang,
-    speaker: speaker ?? "anushka",
-    model: "bulbul:v2",
+    speaker: speaker ?? "priya",
+    model: "bulbul:v3",
     pace: 1.0,
     speech_sample_rate: 22050,
   };
@@ -69,7 +69,11 @@ export async function POST(req: Request) {
       // Earlier API revisions took the text as `inputs: [text]`.
       res = await callSarvam(key, { inputs: [text], ...settings }, signal);
     }
-    if (!res.ok) return browserFallback();
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.warn(`[tts] Sarvam ${res.status}: ${detail.slice(0, 200)}`);
+      return browserFallback();
+    }
 
     const audio = extractAudio(await res.json());
     if (!audio) return browserFallback();

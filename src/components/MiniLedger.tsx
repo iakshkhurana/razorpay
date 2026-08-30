@@ -67,7 +67,8 @@ const STAGES: readonly Stage[] = [
 
 const FINAL_STAGE = STAGES.length - 1;
 
-const CONFETTI_COLOURS = ["#1E6E52", "#B77913", "#6B5CA5", "#28356A"];
+/* stamp colours: PAID green, COUNTER amber, GATE violet, plus the brand blue */
+const CONFETTI_COLOURS = ["#12B76A", "#F59E0B", "#7C5CFF", "#3395FF"];
 
 function reducedMotionQuery(): MediaQueryList | null {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return null;
@@ -78,9 +79,14 @@ export interface MiniLedgerProps {
   /** Bump this to restart the cycle from the first entry. */
   restartKey?: number;
   className?: string;
+  /**
+   * "plain" (default): the bare open book, as before.
+   * "glass": a frosted card with a "Live" header around the book — for gradient backgrounds.
+   */
+  frame?: "plain" | "glass";
 }
 
-export function MiniLedger({ restartKey = 0, className }: MiniLedgerProps) {
+export function MiniLedger({ restartKey = 0, className, frame = "plain" }: MiniLedgerProps) {
   const [stage, setStage] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reduced, setReduced] = useState(false);
@@ -141,15 +147,17 @@ export function MiniLedger({ restartKey = 0, className }: MiniLedgerProps) {
 
   const view = reduced ? STAGES[FINAL_STAGE] : (STAGES[stage] ?? STAGES[0]);
   const animate = !reduced;
+  const glass = frame === "glass";
 
-  return (
+  const book = (
     <div
-      role="img"
-      aria-label="Ledger writing three entries: allowed, countered, paid"
-      className={cn("ledger-spine rounded-xl border border-ink/10 bg-white/50 pl-[6px]", className)}
+      className={cn(
+        "ledger-spine pl-[6px]",
+        glass ? "overflow-hidden rounded-xl border border-rzp-border bg-white" : "rounded-xl border border-ink/10 bg-white/50",
+      )}
     >
       <div aria-hidden="true" className="ruled-paper rounded-r-xl">
-        <div className="flex items-baseline justify-between px-4 pt-3 text-[11px] uppercase tracking-[0.18em] text-ink/70 sm:px-5">
+        <div className="flex items-baseline justify-between px-4 pt-3 text-[11px] uppercase tracking-[0.18em] text-rzp-muted sm:px-5">
           <span className="font-display font-semibold">Ramesh Handlooms · bahi-khata</span>
           <span className="font-mono tnum">page 1</span>
         </div>
@@ -160,14 +168,11 @@ export function MiniLedger({ restartKey = 0, className }: MiniLedgerProps) {
               <li key={e.id} className={cn("px-4 py-3.5 sm:px-5", animate && "animate-write-in")}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <p className="text-base leading-snug sm:text-lg">{e.line}</p>
-                    <p className="mt-1 text-xs text-ink/70">{e.note}</p>
+                    <p className="text-base leading-snug text-rzp-text sm:text-lg">{e.line}</p>
+                    <p className="mt-1 text-xs text-rzp-muted">{e.note}</p>
                   </div>
-                  <div
-                    ref={e.verdict === "PAID" ? paidStampRef : undefined}
-                    className="flex shrink-0 flex-col items-end gap-1.5"
-                  >
-                    <span className={cn("font-mono text-base tnum sm:text-lg", e.verdict === "PAID" && "text-money")}>
+                  <div ref={e.verdict === "PAID" ? paidStampRef : undefined} className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span className={cn("font-mono text-base text-rzp-text tnum sm:text-lg", e.verdict === "PAID" && "text-money")}>
                       {formatINR(e.amount_paise)}
                     </span>
                     <span className="flex h-5 items-center">
@@ -180,6 +185,34 @@ export function MiniLedger({ restartKey = 0, className }: MiniLedgerProps) {
           })}
         </ol>
       </div>
+    </div>
+  );
+
+  if (!glass) {
+    return (
+      <div role="img" aria-label="Ledger writing three entries: allowed, countered, paid" className={className}>
+        {book}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="img"
+      aria-label="Live ledger writing three entries: allowed, countered, paid"
+      className={cn("glass rounded-2xl p-2 shadow-card sm:p-3", className)}
+    >
+      <div aria-hidden="true" className="flex items-center justify-between gap-3 px-2 pb-2 pt-1">
+        <span className="inline-flex items-center gap-2 text-xs font-semibold text-rzp-navy">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-pulse rounded-full bg-rzp-green opacity-60" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rzp-green" />
+          </span>
+          Live: the book writing itself
+        </span>
+        <span className="hidden font-mono text-[10px] uppercase tracking-[0.14em] text-rzp-muted sm:inline">ALLOW → COUNTER → PAID</span>
+      </div>
+      {book}
     </div>
   );
 }

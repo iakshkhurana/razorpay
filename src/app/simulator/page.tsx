@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentType, type CSSProperties } from "react";
+import { AgentVoiceToggle } from "@/components/AgentVoiceToggle";
+import { AppShell } from "@/components/AppShell";
 import { ChatPane, toOrderCard, type ChatItem, type ChatOffer, type NoteTone, type OrderCard } from "@/components/ChatPane";
-import { SiteHeader } from "@/components/SiteHeader";
-import { Button } from "@/components/ui/button";
+import { FloatingCard, RupeeCoin, ShieldCheck, type IllustrationProps } from "@/components/illustrations";
+import { Button, Spinner } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input, Label } from "@/components/ui/input";
+import { FieldHint, Input, Label } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   api,
   ApiError,
@@ -20,6 +23,7 @@ import { formatINR, rupeesToPaise } from "@/lib/money";
 import type { ChatMessage, VerdictEvent } from "@/lib/schemas";
 import { isTourActive, useTourAction, type TourEventDetail } from "@/lib/tour/client";
 import { cn } from "@/lib/utils";
+import { useAgentVoice, type AgentVoice } from "@/lib/voice/useAgentVoice";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -45,6 +49,13 @@ const FALLBACK_GIFT_GOAL: DemoGoalView = {
   goal: "anniversary gift for mom, budget ₹2000",
   cap_paise: DEFAULT_CAP_PAISE,
   scope: DEFAULT_SCOPE,
+};
+
+/** Illustration + one-line story for each demo goal the server offers. */
+const GOAL_ART: Record<DemoGoalView["key"], { Art: ComponentType<IllustrationProps>; blurb: string }> = {
+  gift: { Art: RupeeCoin, blurb: "Cotton saree plus a matching blouse. ALLOW, then PAID." },
+  wedding: { Art: ShieldCheck, blurb: "Juttis out of scope, two Banarasis over the cap. DENY, COUNTER, then the owner's call." },
+  failure: { Art: FloatingCard, blurb: "The bank fails the payment. HELD, backup link, then PAID." },
 };
 
 interface ActiveMandate {
@@ -108,7 +119,7 @@ function ExpiryCountdown({ mandate, onExpire }: { mandate: ActiveMandate; onExpi
     tick();
     return () => window.clearInterval(t);
   }, [mandate, onExpire]);
-  return <dd className={cn("font-mono tnum", left === 0 ? "text-deny" : "text-ink")}>{left === 0 ? "expired" : mmss(left)}</dd>;
+  return <dd className={cn("font-mono tnum", left === 0 ? "text-[#B3262C]" : "text-rzp-text")}>{left === 0 ? "expired" : mmss(left)}</dd>;
 }
 
 function checkoutReply(res: CheckoutResponse): string {
@@ -118,6 +129,23 @@ function checkoutReply(res: CheckoutResponse): string {
   if (res.duplicate) return `This offer was already checked out — here is the same order for ${amount}.`;
   if (res.order.status === "PENDING_APPROVAL") return `Thank you — ${names} for ${amount} is noted. The shop owner will confirm this one shortly.`;
   return `Done — ${names} for ${amount}. Your payment link is ready; the order is confirmed the moment the bank says yes.`;
+}
+
+function ArrowIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function SendIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 12 20 4l-4 16-4.5-6.5L4 12Z" />
+      <path d="M11.5 13.5 20 4" />
+    </svg>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -130,6 +158,7 @@ export default function SimulatorPage() {
   const [goals, setGoals] = useState<DemoGoalView[]>([]);
   const [goalsError, setGoalsError] = useState<string | null>(null);
   const [modes, setModes] = useState<StatsResponse["modes"] | null>(null);
+  const [merchantName, setMerchantName] = useState<string | null>(null);
   const [sellerMode, setSellerMode] = useState<"openai" | "fallback" | null>(null);
 
   const [running, setRunning] = useState(false);
@@ -158,6 +187,37 @@ export default function SimulatorPage() {
   const celebratedRef = useRef<Set<string>>(new Set());
 
   /* ---------------------------------------------------------------- */
+  /*  Voice: the seller reads its replies aloud                        */
+  /* ---------------------------------------------------------------- */
+
+  const voice = useAgentVoice();
+  const voiceRef = useRef<AgentVoice>(voice);
+  voiceRef.current = voice;
+  const [speaking, setSpeaking] = useState(false);
+  const speakSeqRef = useRef(0);
+
+  /** Queues a seller line for playback and keeps the equalizer on until the newest line has finished. */
+  const sayAsSeller = useCallback((text: string) => {
+    const v = voiceRef.current;
+    if (!v.enabled) return;
+    const seq = ++speakSeqRef.current;
+    setSpeaking(true);
+    v.speak(text, "en-IN").finally(() => {
+      if (seq === speakSeqRef.current) setSpeaking(false);
+    });
+  }, []);
+
+  /** Cuts any playback: a new turn is starting, or the conversation is being cleared. */
+  const hushSeller = useCallback(() => {
+    speakSeqRef.current += 1;
+    voiceRef.current.stop();
+    setSpeaking(false);
+  }, []);
+
+  // Leaving the page must not leave the seller talking.
+  useEffect(() => () => voiceRef.current.stop(), []);
+
+  /* ---------------------------------------------------------------- */
   /*  Chat helpers                                                     */
   /* ---------------------------------------------------------------- */
 
@@ -175,8 +235,9 @@ export default function SimulatorPage() {
     (text: string, events: VerdictEvent[], offer: ChatOffer | null) => {
       if (offer) lastOfferRef.current = offer;
       setItems((prev) => [...prev, { id: nextId("s"), kind: "seller", text, events, offer }]);
+      sayAsSeller(text);
     },
-    [nextId],
+    [nextId, sayAsSeller],
   );
   const addOrder = useCallback((order: OrderCard) => setItems((prev) => [...prev, { id: nextId("o"), kind: "order", order }]), [nextId]);
   const updateOrder = useCallback((order: OrderCard) => {
@@ -213,7 +274,7 @@ export default function SimulatorPage() {
         gravity: 0.9,
         ticks: 160,
         origin: { x: 0.35, y: 0.6 },
-        colors: ["#1E6E52", "#B77913", "#28356A"],
+        colors: ["#12B76A", "#3395FF", "#F59E0B"],
         disableForReducedMotion: true,
       });
     } catch {
@@ -263,13 +324,14 @@ export default function SimulatorPage() {
 
   const resetChat = useCallback(() => {
     stopPolling();
+    hushSeller();
     setItems([]);
     setPollError(null);
     sessionRef.current = undefined;
     lastOfferRef.current = null;
     resolvedOffersRef.current = new Set();
     setResolvedOffers([]);
-  }, [stopPolling]);
+  }, [hushSeller, stopPolling]);
 
   /** Mints a mandate and makes it current. Returns null (after a chat line) when the server refuses. */
   const issue = useCallback(
@@ -322,6 +384,7 @@ export default function SimulatorPage() {
   /** One buyer line through the seller. Appends both bubbles, stamps, and any order. */
   const sellerTurn = useCallback(
     async (token: string, message: string, gen: number): Promise<NegotiateResponse | null> => {
+      hushSeller();
       addBuyer(message);
       setBusy(true);
       try {
@@ -348,12 +411,13 @@ export default function SimulatorPage() {
         if (gen === genRef.current) setBusy(false);
       }
     },
-    [addBuyer, addNote, addOrder, addSeller, resolveOffer, startPolling],
+    [addBuyer, addNote, addOrder, addSeller, hushSeller, resolveOffer, startPolling],
   );
 
   /** Direct checkout of an offer (the Accept button and the tour's safety net). Returns the order id. */
   const checkoutOffer = useCallback(
     async (token: string, offer: ChatOffer, gen: number): Promise<string | null> => {
+      hushSeller();
       addBuyer(ACCEPT_LINE);
       setBusy(true);
       try {
@@ -381,7 +445,7 @@ export default function SimulatorPage() {
         if (gen === genRef.current) setBusy(false);
       }
     },
-    [addBuyer, addNote, addOrder, addSeller, resolveOffer, startPolling],
+    [addBuyer, addNote, addOrder, addSeller, hushSeller, resolveOffer, startPolling],
   );
 
   const simulateBank = useCallback(
@@ -622,7 +686,10 @@ export default function SimulatorPage() {
 
     api
       .stats()
-      .then((res) => setModes(res.modes))
+      .then((res) => {
+        setModes(res.modes);
+        setMerchantName(res.merchant?.name ?? null);
+      })
       .catch(() => setModes(null));
 
     if (!isTourActive()) {
@@ -641,219 +708,261 @@ export default function SimulatorPage() {
       ? lastOffer.id
       : null;
   const shownSellerMode = sellerMode ?? modes?.llm ?? null;
+  /** Top-bar pill: hidden until a voice provider is known (identical on server and first client render). */
+  const voicePill = voice.provider === "none" ? undefined : voice.enabled;
 
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
 
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight">Buyer simulator</h1>
-            <p className="mt-1 max-w-2xl text-sm text-ink/70">
-              An AI buyer shops under a signed mandate. Every price the seller quotes has already passed the policy engine — the stamps land as it speaks.
+    <AppShell
+      section="simulator"
+      title="Buyer simulator"
+      subtitle="Talk to the seller as an AI buyer. Every price arrives with a verdict."
+      actions={<AgentVoiceToggle />}
+      voice={voicePill}
+    >
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        {/* LEFT: the conversation */}
+        <div className="fade-up flex min-h-0 flex-col">
+          <ChatPane
+            items={items}
+            busy={busy}
+            acceptableOfferId={acceptableOfferId}
+            accepting={accepting}
+            onAcceptOffer={(offer) => void acceptOffer(offer)}
+            sellerName={merchantName}
+            sellerMode={shownSellerMode}
+            paymentsMode={modes?.payments ?? null}
+            speaking={speaking}
+            className="h-[70vh] min-h-[520px]"
+          />
+          {pollError ? (
+            <p className="mt-2 text-sm text-[#B3262C]" role="status">
+              {pollError}
             </p>
-          </div>
+          ) : null}
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-          {/* LEFT: the conversation */}
-          <div className="flex min-h-0 flex-col">
-            <ChatPane
-              items={items}
-              busy={busy}
-              acceptableOfferId={acceptableOfferId}
-              accepting={accepting}
-              onAcceptOffer={(offer) => void acceptOffer(offer)}
-              className="h-[72vh] min-h-[520px]"
-            />
-            {pollError ? (
-              <p className="mt-2 text-sm text-deny" role="status">
-                {pollError}
-              </p>
-            ) : null}
-          </div>
+        {/* RIGHT: the rail */}
+        <aside className="fade-up space-y-4" style={{ "--delay": "120ms" } as CSSProperties} aria-label="Mandate and controls">
+          {/* 1. Mandate passbook */}
+          <Card surface="ledger">
+            <CardContent className="space-y-4 pt-5">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="font-display text-lg font-semibold tracking-tight text-rzp-text">Mandate</h2>
+                <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-rzp-muted">Passbook</span>
+              </div>
 
-          {/* RIGHT: the rail */}
-          <aside className="space-y-4" aria-label="Mandate and controls">
-            {/* 1. Mandate passbook stub */}
-            <Card className="ledger-spine ruled-paper pl-[6px]">
-              <CardContent className="space-y-4 pt-5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h2 className="font-display text-lg font-semibold tracking-tight">Mandate</h2>
-                  <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink/70">Passbook stub</span>
+              {mandate ? (
+                <dl className="space-y-1.5 text-sm">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-rzp-muted">Agent</dt>
+                    <dd className="font-mono text-xs tnum text-rzp-text">{mandate.view.agent_id}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-rzp-muted">For</dt>
+                    <dd className="truncate font-mono text-xs tnum text-rzp-text" title={mandate.view.user_ref}>
+                      {mandate.view.user_ref}
+                    </dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3 border-t border-rzp-border pt-2">
+                    <dt className="font-medium text-rzp-text">Cap</dt>
+                    <dd className="font-mono text-2xl font-semibold tnum text-[#087443]">{formatINR(mandate.view.spend_cap_paise)}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-rzp-muted">Scope</dt>
+                    <dd className="text-right text-rzp-text">{mandate.view.scope}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-rzp-muted">Expires in</dt>
+                    <ExpiryCountdown mandate={mandate} onExpire={onExpire} />
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-rzp-muted">Mandate id</dt>
+                    <dd className="truncate font-mono text-[11px] tnum text-rzp-muted" title={mandate.view.id}>
+                      {mandate.view.id}
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <div aria-busy={issuing || undefined}>
+                  {issuing ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-3.5 w-full" />
+                      <Skeleton className="h-3.5 w-3/4" />
+                      <Skeleton className="h-8 w-1/2" />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-rzp-muted">No mandate yet. Issue one to let the buyer in.</p>
+                  )}
                 </div>
+              )}
+              {expired ? <p className="text-xs text-[#B3262C]">This mandate has expired. Issue a fresh one before the buyer talks again.</p> : null}
 
-                {mandate ? (
-                  <dl className="space-y-1.5 text-sm">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <dt className="text-ink/70">Agent</dt>
-                      <dd className="font-mono text-xs tnum">{mandate.view.agent_id}</dd>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <dt className="text-ink/70">For</dt>
-                      <dd className="truncate font-mono text-xs tnum" title={mandate.view.user_ref}>
-                        {mandate.view.user_ref}
-                      </dd>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3 border-t border-ink/10 pt-2">
-                      <dt className="font-medium">Cap</dt>
-                      <dd className="font-mono text-xl font-semibold tnum text-money">{formatINR(mandate.view.spend_cap_paise)}</dd>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <dt className="text-ink/70">Scope</dt>
-                      <dd className="text-right">{mandate.view.scope}</dd>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <dt className="text-ink/70">Expires in</dt>
-                      <ExpiryCountdown mandate={mandate} onExpire={onExpire} />
-                    </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <dt className="text-ink/70">Mandate id</dt>
-                      <dd className="truncate font-mono text-[11px] tnum text-ink/70" title={mandate.view.id}>
-                        {mandate.view.id}
-                      </dd>
-                    </div>
-                  </dl>
-                ) : (
-                  <p className="text-sm text-ink/70">No mandate yet. Issue one to let the buyer in.</p>
-                )}
-                {expired ? <p className="text-xs text-deny">This mandate has expired. Issue a fresh one before the buyer talks again.</p> : null}
-
-                <div className="space-y-2 border-t border-ink/10 pt-3">
-                  <p className="text-xs font-medium text-ink/70" id="cap-label">
-                    Spend cap for the next mandate
-                  </p>
-                  <div className="flex flex-wrap gap-2" role="group" aria-labelledby="cap-label">
-                    {CAP_PRESETS.map((cap) => (
-                      <button
-                        key={cap}
-                        type="button"
-                        aria-pressed={capChoice === cap}
-                        onClick={() => setCapChoice(cap)}
-                        className={cn(
-                          "h-8 rounded-full border px-3 font-mono text-xs tnum transition-colors",
-                          capChoice === cap ? "border-action bg-action text-paper" : "border-ink/15 bg-white/60 text-ink hover:border-ink/40",
-                        )}
-                      >
-                        {formatINR(cap)}
-                      </button>
-                    ))}
+              <div className="space-y-2.5 border-t border-rzp-border pt-3">
+                <p className="text-xs font-medium text-rzp-muted" id="cap-label">
+                  Spend cap for the next mandate
+                </p>
+                <div className="grid grid-cols-3 gap-1 rounded-xl bg-rzp-mist2 p-1" role="group" aria-labelledby="cap-label">
+                  {CAP_PRESETS.map((cap) => (
                     <button
+                      key={cap}
                       type="button"
-                      aria-pressed={capChoice === "custom"}
-                      onClick={() => setCapChoice("custom")}
+                      aria-pressed={capChoice === cap}
+                      onClick={() => setCapChoice(cap)}
                       className={cn(
-                        "h-8 rounded-full border px-3 text-xs transition-colors",
-                        capChoice === "custom" ? "border-action bg-action text-paper" : "border-ink/15 bg-white/60 text-ink hover:border-ink/40",
+                        "h-8 rounded-lg font-mono text-xs tnum transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
+                        capChoice === cap ? "bg-white font-semibold text-rzp-blueDeep shadow-sm" : "text-rzp-muted hover:text-rzp-text",
                       )}
                     >
-                      Custom
+                      {formatINR(cap)}
                     </button>
-                  </div>
-                  {capChoice === "custom" ? (
-                    <div>
-                      <Label htmlFor="custom-cap" className="text-xs">
-                        Cap in rupees
-                      </Label>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-ink/70">₹</span>
-                        <Input
-                          id="custom-cap"
-                          inputMode="numeric"
-                          value={customCap}
-                          onChange={(e) => setCustomCap(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") void issueFromSelector();
-                          }}
-                          className="font-mono tnum"
-                          aria-invalid={capError ? true : undefined}
-                        />
-                      </div>
+                  ))}
+                  <button
+                    type="button"
+                    aria-pressed={capChoice === "custom"}
+                    onClick={() => setCapChoice("custom")}
+                    className={cn(
+                      "h-8 rounded-lg text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
+                      capChoice === "custom" ? "bg-white font-semibold text-rzp-blueDeep shadow-sm" : "text-rzp-muted hover:text-rzp-text",
+                    )}
+                  >
+                    Custom
+                  </button>
+                </div>
+                {capChoice === "custom" ? (
+                  <div>
+                    <Label htmlFor="custom-cap" className="text-xs">
+                      Cap in rupees
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm text-rzp-muted" aria-hidden="true">
+                        ₹
+                      </span>
+                      <Input
+                        id="custom-cap"
+                        inputMode="numeric"
+                        value={customCap}
+                        onChange={(e) => setCustomCap(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void issueFromSelector();
+                        }}
+                        className="font-mono tnum"
+                        aria-invalid={capError ? true : undefined}
+                        aria-describedby={capError ? "custom-cap-error" : undefined}
+                      />
                     </div>
-                  ) : null}
-                  {capError ? <p className="text-xs text-deny">{capError}</p> : null}
-                  <Button className="w-full" onClick={() => void issueFromSelector()} loading={issuing} disabled={running || issuing}>
-                    Issue new mandate
-                  </Button>
-                  <p className="text-[11px] text-ink/70">Scope stays handloom, gifts. A new mandate clears the conversation.</p>
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                ) : null}
+                {capError ? (
+                  <FieldHint error id="custom-cap-error">
+                    {capError}
+                  </FieldHint>
+                ) : null}
+                <Button className="w-full" onClick={() => void issueFromSelector()} loading={issuing} disabled={running || issuing}>
+                  Issue new mandate
+                </Button>
+                <p className="text-[11px] text-rzp-muted">Scope stays handloom, gifts. A new mandate clears the conversation.</p>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* 2. Demo buyer */}
-            <Card>
-              <CardContent className="space-y-3 pt-5">
-                <div>
-                  <h2 className="font-display text-lg font-semibold tracking-tight">Run demo buyer</h2>
-                  <p className="mt-0.5 text-xs text-ink/70">Pick a goal. The buyer only talks; the engine decides.</p>
+          {/* 2. Demo buyer goals */}
+          <Card>
+            <CardContent className="space-y-3 pt-5">
+              <div>
+                <h2 className="font-display text-lg font-semibold tracking-tight text-rzp-text">Run a demo buyer</h2>
+                <p className="mt-0.5 text-xs text-rzp-muted">Pick a goal. The buyer only talks; the engine decides.</p>
+              </div>
+              {goalsError ? <p className="text-sm text-[#B3262C]">{goalsError}</p> : null}
+              {goals.length === 0 && !goalsError ? (
+                <div className="space-y-2" aria-busy="true" aria-label="Loading demo goals">
+                  <Skeleton className="h-[74px] w-full rounded-xl" />
+                  <Skeleton className="h-[74px] w-full rounded-xl" />
+                  <Skeleton className="h-[74px] w-full rounded-xl" />
                 </div>
-                {goalsError ? <p className="text-sm text-deny">{goalsError}</p> : null}
-                {goals.length === 0 && !goalsError ? <p className="text-xs text-ink/70">Loading goals…</p> : null}
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Demo goals">
-                  {goals.map((goal) => {
-                    const active = runningGoal === goal.key;
-                    return (
-                      <Button
-                        key={goal.key}
-                        variant={active ? "primary" : "outline"}
-                        size="sm"
-                        className="h-auto whitespace-normal rounded-full px-3 py-1.5 text-left text-xs"
-                        onClick={() => void runDemo(goal)}
-                        loading={active}
-                        disabled={running}
-                        title={goal.goal}
-                      >
-                        {goal.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+              ) : null}
+              <div className="space-y-2" role="group" aria-label="Demo goals">
+                {goals.map((goal) => {
+                  const active = runningGoal === goal.key;
+                  const art = GOAL_ART[goal.key];
+                  const Art = art?.Art ?? RupeeCoin;
+                  return (
+                    <button
+                      key={goal.key}
+                      type="button"
+                      onClick={() => void runDemo(goal)}
+                      disabled={running}
+                      aria-busy={active || undefined}
+                      title={goal.goal}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-xl border bg-white p-3 text-left transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
+                        "disabled:cursor-not-allowed disabled:opacity-60",
+                        !running && "card-lift hover:border-[#C9D6EC]",
+                        active ? "border-rzp-blue ring-1 ring-rzp-blue/40" : "border-rzp-border",
+                      )}
+                    >
+                      <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-rzp-mist2">
+                        <Art className="w-12" animate={false} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-rzp-text">{goal.label}</span>
+                        <span className="mt-0.5 block text-xs leading-snug text-rzp-muted">{art?.blurb ?? goal.goal}</span>
+                      </span>
+                      {active ? (
+                        <Spinner className="h-4 w-4 shrink-0 text-rzp-blue" />
+                      ) : (
+                        <ArrowIcon className="h-4 w-4 shrink-0 text-rzp-muted" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* 3. Talk as the buyer */}
-            <Card>
-              <CardContent className="space-y-2 pt-5">
-                <h2 className="font-display text-lg font-semibold tracking-tight">
-                  <label htmlFor="buyer-line">Talk as the buyer</label>
-                </h2>
-                <div className="flex gap-2">
-                  <Input
-                    id="buyer-line"
-                    value={draft}
-                    placeholder="Ask for a saree under ₹2,000…"
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                        e.preventDefault();
-                        void sendManual();
-                      }
-                    }}
-                    disabled={running}
-                    autoComplete="off"
-                  />
-                  <Button onClick={() => void sendManual()} disabled={running || draft.trim().length === 0}>
-                    Send
-                  </Button>
-                </div>
-                <p className="text-[11px] text-ink/70">Enter sends. The line goes to the seller under the current mandate.</p>
-              </CardContent>
-            </Card>
+          {/* 3. Talk as the buyer */}
+          <Card>
+            <CardContent className="space-y-2 pt-5">
+              <h2 className="font-display text-lg font-semibold tracking-tight text-rzp-text">
+                <label htmlFor="buyer-line">Talk as the buyer</label>
+              </h2>
+              <div className="flex gap-2">
+                <Input
+                  id="buyer-line"
+                  value={draft}
+                  placeholder="Ask for a saree under ₹2,000…"
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      void sendManual();
+                    }
+                  }}
+                  disabled={running}
+                  autoComplete="off"
+                />
+                <Button onClick={() => void sendManual()} disabled={running || draft.trim().length === 0} className="shrink-0">
+                  <SendIcon className="h-4 w-4" />
+                  Send
+                </Button>
+              </div>
+              <p className="text-[11px] text-rzp-muted">Enter sends. The line goes to the seller under the current mandate.</p>
+            </CardContent>
+          </Card>
 
-            {/* 4. Modes */}
-            <p className="px-1 text-xs text-ink/70">
-              Modes: seller{" "}
-              <span className="font-mono text-ink/80">{shownSellerMode ?? "—"}</span> · payments{" "}
-              <span className="font-mono text-ink/80">{modes?.payments ?? "—"}</span>
-              {shownSellerMode === "fallback" ? <span> · scripted seller, no key needed</span> : null}
-            </p>
-          </aside>
-        </div>
-      </main>
-    </>
+          {/* 4. Modes */}
+          <p className="px-1 text-xs text-rzp-muted">
+            Seller <span className="font-mono text-rzp-text">{shownSellerMode ?? "—"}</span> · payments{" "}
+            <span className="font-mono text-rzp-text">{modes?.payments ?? "—"}</span> · voice{" "}
+            <span className="font-mono text-rzp-text">{voice.provider === "none" ? "—" : voice.enabled ? voice.provider : "off"}</span>
+            {shownSellerMode === "fallback" ? <span> · scripted seller, no key needed</span> : null}
+          </p>
+        </aside>
+      </div>
+    </AppShell>
   );
 }

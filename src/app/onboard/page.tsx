@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SiteHeader } from "@/components/SiteHeader";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { AppShell } from "@/components/AppShell";
+import { FloatingCard, Storefront } from "@/components/illustrations";
 import { VoiceMic } from "@/components/VoiceMic";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Spinner, buttonClasses } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError, sleep, type OnboardResponse } from "@/lib/demo/client";
@@ -124,6 +126,19 @@ const SOURCE_LABEL: Record<OnboardResponse["source"], string> = {
 };
 
 const FALLBACK_NOTE = "We could not read products from what you gave us, so this is the sample catalog. Edit these rows, or go back and paste a CSV with name and price columns.";
+
+const ERROR_TEXT = "text-[#B3262C]";
+
+/* Table inputs that read as cells: quiet until hovered or focused. */
+const CELL =
+  "h-9 rounded-lg border-transparent bg-transparent px-2 shadow-none hover:border-rzp-border hover:bg-rzp-mist " +
+  "focus:border-rzp-blue focus:bg-white disabled:cursor-default disabled:bg-transparent disabled:text-rzp-text";
+
+const NEXT_STEPS = [
+  "AI reads the catalog and drafts a rulebook.",
+  "You approve every line — humans set the rules.",
+  "Every sale gets written in the book.",
+] as const;
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -382,56 +397,48 @@ export default function OnboardPage() {
   /* ---- render ------------------------------------------------------- */
 
   const allowlistEmpty = policy !== null && policy.category_allowlist.length === 0;
+  const allowedCount = policy ? skus.filter((s) => policy.category_allowlist.includes(s.category)).length : 0;
+  const shopName = merchantName.trim() || DEFAULT_MERCHANT;
+
+  const headerActions =
+    step === "review" ? (
+      live ? (
+        <Badge tone="green" dot className="h-8 px-3 text-sm">
+          Live
+        </Badge>
+      ) : (
+        <Button type="button" variant="secondary" size="sm" onClick={() => goToStep("catalog")} disabled={confirming}>
+          Back to catalog
+        </Button>
+      )
+    ) : undefined;
 
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto max-w-6xl px-6 pb-20 pt-10">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-ink/70">
-              Onboarding · {step === "catalog" ? "Catalog" : "Review & rules"}
-            </p>
-            <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">Apni dukaan AI buyers ke liye kholiye.</h1>
-            <p className="mt-2 max-w-xl text-ink/65">
-              Paste your catalog, check the rulebook, go live. Nothing sells until you approve it — and every sale gets written in the book.
-            </p>
-          </div>
-          <nav aria-label="Onboarding progress" className="flex items-center gap-2 text-sm">
-            <span
-              aria-current={step === "catalog" ? "step" : undefined}
-              className={cn("rounded-full border px-3 py-1", step === "catalog" ? "border-action bg-action text-paper" : "border-ink/15 text-ink/70")}
-            >
-              Catalog
-            </span>
-            <span aria-hidden="true" className="text-ink/30">
-              →
-            </span>
-            <span
-              aria-current={step === "review" ? "step" : undefined}
-              className={cn("rounded-full border px-3 py-1", step === "review" ? "border-action bg-action text-paper" : "border-ink/15 text-ink/70")}
-            >
-              Review & rules
-            </span>
-          </nav>
-        </div>
+    <AppShell
+      section="onboard"
+      title="Onboard a shop"
+      subtitle="Apni dukaan AI buyers ke liye kholiye — catalog paste karo, rulebook approve karo."
+      actions={headerActions}
+      headerExtra={<Stepper step={step} live={live} />}
+    >
+      {step === "catalog" && drafting ? <DraftingSkeleton /> : null}
 
-        {step === "catalog" ? (
-          <form
-            className="max-w-3xl"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void draftShop({ csv, url: storeUrl, merchant_name: merchantName, utterance });
-            }}
-          >
-            <Card>
-              <CardHeader>
-                <div>
-                  <CardTitle>Your shop</CardTitle>
-                  <CardDescription className="text-ink/70">Naam, website (optional) aur catalog. A CSV with name and price columns is enough.</CardDescription>
+      {step === "catalog" && !drafting ? (
+        <form
+          className="fade-up"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void draftShop({ csv, url: storeUrl, merchant_name: merchantName, utterance });
+          }}
+        >
+          <Card elevated className="overflow-hidden">
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
+              <div className="p-5 sm:p-7">
+                <div className="mb-5">
+                  <h2 className="font-display text-xl font-semibold tracking-tight text-rzp-text">Your shop</h2>
+                  <p className="mt-1 text-sm text-rzp-muted">Naam, website (optional) aur catalog. A CSV with name and price columns is enough.</p>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="merchant-name">Shop name</Label>
@@ -445,7 +452,7 @@ export default function OnboardPage() {
                   </div>
                   <div>
                     <Label htmlFor="store-url">
-                      Store URL <span className="font-normal text-ink/70">(optional)</span>
+                      Store URL <span className="font-normal text-rzp-muted">(optional)</span>
                     </Label>
                     <Input
                       id="store-url"
@@ -458,7 +465,7 @@ export default function OnboardPage() {
                   </div>
                 </div>
 
-                <div>
+                <div className="mt-5">
                   <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
                     <Label htmlFor="catalog-csv" className="mb-0">
                       Catalog CSV
@@ -468,11 +475,13 @@ export default function OnboardPage() {
                       onClick={() => void loadSample()}
                       disabled={sampleLoading || drafting}
                       aria-busy={sampleLoading}
-                      className="text-sm font-medium text-action underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-rzp-blueDeep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
+                      {sampleLoading ? <Spinner className="h-3.5 w-3.5" /> : <SparkIcon className="h-3.5 w-3.5" />}
                       Use Ramesh ji’s sample catalog
                     </button>
                   </div>
+
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -484,8 +493,15 @@ export default function OnboardPage() {
                       setDragOver(false);
                       void readFile(e.dataTransfer.files?.[0]);
                     }}
-                    className={cn("rounded-xl border border-dashed p-2 transition-colors", dragOver ? "border-action bg-action/5" : "border-ink/15")}
+                    className={cn(
+                      "relative overflow-hidden rounded-2xl border-2 border-dashed p-3 transition-colors duration-150",
+                      "focus-within:border-rzp-blue focus-within:bg-white",
+                      dragOver ? "border-rzp-blue bg-rzp-blue/5" : "border-rzp-border bg-rzp-mist/70",
+                    )}
                   >
+                    <div aria-hidden="true" className="pointer-events-none absolute -bottom-8 -right-6 w-52 opacity-[0.16] sm:w-64">
+                      <FloatingCard className="w-full" />
+                    </div>
                     <Textarea
                       id="catalog-csv"
                       value={csv}
@@ -493,14 +509,15 @@ export default function OnboardPage() {
                       rows={9}
                       spellCheck={false}
                       placeholder={"name,price,stock,category\nCotton Handloom Saree,1499,15,handloom\nBrass Diya Gift Set,499,25,gifts"}
-                      className="min-h-[180px] border-transparent bg-transparent focus:border-transparent"
+                      className="relative z-[1] min-h-[200px] border-transparent bg-transparent shadow-none hover:border-transparent focus:border-transparent focus:ring-0"
                     />
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 pt-2 text-xs text-ink/70">
+                    <div className="relative z-[1] flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 pt-2 text-xs text-rzp-muted">
+                      <UploadIcon className="h-4 w-4 text-rzp-blueDeep" />
                       <span>Drop a .csv file here, or</span>
                       <button
                         type="button"
                         onClick={() => fileInput.current?.click()}
-                        className="font-medium text-action underline-offset-4 hover:underline"
+                        className="rounded-sm font-medium text-rzp-blueDeep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-1"
                       >
                         choose a file
                       </button>
@@ -522,302 +539,480 @@ export default function OnboardPage() {
                 <VoiceMic
                   onTranscript={(text) => setUtterance(text)}
                   disabled={drafting}
-                  className="rounded-xl border border-ink/10 bg-paper/70 p-4"
+                  className="mt-5 rounded-2xl border border-rzp-border bg-rzp-mist p-4"
                 />
                 {utterance ? (
-                  <p className="text-sm text-ink/80" aria-live="polite">
+                  <p className="mt-3 text-sm text-rzp-text" aria-live="polite">
                     Suna: <span className="italic">“{utterance}”</span> — yeh rule draft mein jud jayega.{" "}
-                    <button type="button" onClick={() => setUtterance("")} className="text-action underline-offset-4 hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => setUtterance("")}
+                      className="rounded-sm font-medium text-rzp-blueDeep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-1"
+                    >
                       Hatao
                     </button>
                   </p>
                 ) : null}
 
-                <div className="flex flex-wrap items-center gap-4 pt-1">
+                <div className="mt-6 flex flex-wrap items-center gap-4">
                   <Button type="submit" size="lg" loading={drafting} disabled={drafting || sampleLoading}>
                     Draft my shop
                   </Button>
                   {draftError ? (
-                    <p className="text-sm text-deny" role="alert">
+                    <p className={cn("text-sm", ERROR_TEXT)} role="alert">
                       {draftError}
                     </p>
                   ) : (
-                    <p className="text-sm text-ink/70">AI reads the catalog and drafts your rulebook. You approve it next.</p>
+                    <p className="text-sm text-rzp-muted">AI reads the catalog and drafts your rulebook. You approve it next.</p>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </form>
-        ) : null}
+              </div>
 
-        {step === "review" && policy ? (
-          <>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-              <Card>
-                <CardHeader>
-                  <div>
-                    <CardTitle>Catalog</CardTitle>
-                    <CardDescription className="text-ink/70">
-                      {skus.length} {skus.length === 1 ? "product" : "products"} {draftSource ? SOURCE_LABEL[draftSource] : "drafted"}. Edit anything before
-                      going live.
-                    </CardDescription>
-                    {draftSource === "fallback" ? <p className="mt-2 text-sm text-turmeric">{FALLBACK_NOTE}</p> : null}
-                  </div>
-                  {!live ? (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => goToStep("catalog")} disabled={confirming}>
-                      Back to catalog
-                    </Button>
-                  ) : null}
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs uppercase tracking-[0.12em] text-ink/70">
-                          <th scope="col" className="pb-2 pr-2 font-medium">
-                            Emoji
-                          </th>
-                          <th scope="col" className="pb-2 pr-2 font-medium">
-                            Name
-                          </th>
-                          <th scope="col" className="pb-2 pr-2 font-medium">
-                            Category
-                          </th>
-                          <th scope="col" className="pb-2 pr-2 text-right font-medium">
-                            Price ₹
-                          </th>
-                          <th scope="col" className="pb-2 text-right font-medium">
-                            Stock
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ink/5">
-                        {skus.map((s, i) => (
-                          <tr key={s.id}>
-                            <td className="py-1.5 pr-2">
+              <aside className="relative hidden border-l border-rzp-border bg-rzp-mist2 bg-dots lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-6">
+                <Storefront className="w-full max-w-[250px]" title="A small storefront, open for AI buyers" />
+                <p className="mt-4 self-stretch text-[11px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">What happens next</p>
+                <ol className="mt-2 space-y-2 self-stretch text-sm text-rzp-text">
+                  {NEXT_STEPS.map((line) => (
+                    <li key={line} className="flex gap-2.5">
+                      <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-rzp-blueDeep" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ol>
+              </aside>
+            </div>
+          </Card>
+        </form>
+      ) : null}
+
+      {step === "review" && policy ? (
+        <div className="fade-up space-y-6">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
+            {/* ---- SKU table ------------------------------------------ */}
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Catalog</CardTitle>
+                  <CardDescription>
+                    {skus.length} {skus.length === 1 ? "product" : "products"} {draftSource ? SOURCE_LABEL[draftSource] : "drafted"}. Edit anything before going
+                    live.
+                  </CardDescription>
+                  {draftSource === "fallback" ? <p className="mt-2 text-sm text-[#9A4F00]">{FALLBACK_NOTE}</p> : null}
+                </div>
+                <Badge tone={allowedCount > 0 ? "blue" : "amber"} className="shrink-0">
+                  {allowedCount} of {skus.length} sellable
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="scrollbar-thin -mx-2 overflow-x-auto px-2">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-[11px] uppercase tracking-[0.14em] text-rzp-muted">
+                        <th scope="col" className="pb-2 pl-2 pr-2 font-semibold">
+                          Product
+                        </th>
+                        <th scope="col" className="pb-2 pr-2 font-semibold">
+                          Category
+                        </th>
+                        <th scope="col" className="pb-2 pr-2 text-right font-semibold">
+                          Price ₹
+                        </th>
+                        <th scope="col" className="pb-2 pr-2 text-right font-semibold">
+                          Stock
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-rzp-border">
+                      {skus.map((s, i) => (
+                        <tr key={s.id} className="transition-colors hover:bg-rzp-mist/60">
+                          <td className="py-1 pr-2">
+                            <div className="flex items-center gap-1">
                               <Input
                                 aria-label={`Emoji for ${s.name || "product"}`}
                                 value={s.image_emoji}
                                 onChange={(e) => updateSku(i, { image_emoji: e.target.value })}
                                 disabled={live}
-                                className="w-14 px-1 text-center text-lg"
+                                className={cn(CELL, "w-12 px-1 text-center text-lg")}
                               />
-                            </td>
-                            <td className="py-1.5 pr-2">
                               <Input
                                 aria-label={`Name of product ${i + 1}`}
                                 value={s.name}
                                 onChange={(e) => updateSku(i, { name: e.target.value })}
                                 disabled={live}
-                                className="min-w-[180px]"
+                                aria-invalid={s.name.trim() ? undefined : true}
+                                className={cn(CELL, "min-w-[180px] font-medium")}
                               />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <Badge tone={policy.category_allowlist.includes(s.category) ? "action" : "ink"}>{s.category}</Badge>
-                            </td>
-                            <td className="py-1.5 pr-2 text-right">
-                              <Input
-                                type="number"
-                                min={0}
-                                step={1}
-                                inputMode="decimal"
-                                aria-label={`Price in rupees for ${s.name || "product"}`}
-                                value={paiseToRupees(s.price_paise)}
-                                onChange={(e) => {
-                                  const n = Number(e.target.value);
-                                  updateSku(i, { price_paise: Number.isFinite(n) && n >= 0 ? rupeesToPaise(n) : 0 });
-                                }}
-                                disabled={live}
-                                className="w-28 text-right font-mono tnum"
-                              />
-                            </td>
-                            <td className="py-1.5 text-right">
-                              <Input
-                                type="number"
-                                min={0}
-                                step={1}
-                                inputMode="numeric"
-                                aria-label={`Stock for ${s.name || "product"}`}
-                                value={s.stock}
-                                onChange={(e) => {
-                                  const n = Number.parseInt(e.target.value, 10);
-                                  updateSku(i, { stock: Number.isFinite(n) && n >= 0 ? n : 0 });
-                                }}
-                                disabled={live}
-                                className="w-20 text-right font-mono tnum"
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </div>
+                          </td>
+                          <td className="py-1 pr-2">
+                            <Badge tone={policy.category_allowlist.includes(s.category) ? "blue" : "gray"}>{s.category}</Badge>
+                          </td>
+                          <td className="py-1 pr-2 text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              inputMode="decimal"
+                              aria-label={`Price in rupees for ${s.name || "product"}`}
+                              value={paiseToRupees(s.price_paise)}
+                              onChange={(e) => {
+                                const n = Number(e.target.value);
+                                updateSku(i, { price_paise: Number.isFinite(n) && n >= 0 ? rupeesToPaise(n) : 0 });
+                              }}
+                              disabled={live}
+                              className={cn(CELL, "w-28 text-right font-mono tnum")}
+                            />
+                          </td>
+                          <td className="py-1 pr-2 text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              inputMode="numeric"
+                              aria-label={`Stock for ${s.name || "product"}`}
+                              value={s.stock}
+                              onChange={(e) => {
+                                const n = Number.parseInt(e.target.value, 10);
+                                updateSku(i, { stock: Number.isFinite(n) && n >= 0 ? n : 0 });
+                              }}
+                              disabled={live}
+                              className={cn(CELL, "w-20 text-right font-mono tnum")}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-3 text-xs text-rzp-muted">
+                  Prices are list prices in rupees. Categories outside the rulebook’s allowlist stay in the catalog but cannot be sold to AI buyers.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* ---- Rulebook ------------------------------------------- */}
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Rulebook</CardTitle>
+                  <CardDescription>AI ne draft kiya, aap approve karo. The policy engine enforces every line — the AI never decides.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                <div className="mb-3 flex flex-wrap gap-2" aria-label="Rulebook summary">
+                  <Badge tone="blue" dot>
+                    Floor {policy.price_floor_pct}%
+                  </Badge>
+                  <Badge tone="blue" dot>
+                    Max discount {policy.max_discount_pct}%
+                  </Badge>
+                  <Badge tone="violet" dot>
+                    Ask me above {formatINR(policy.gate_above_paise)}
+                  </Badge>
+                  <Badge tone="gray" dot>
+                    Max {policy.max_qty_per_order} {policy.max_qty_per_order === 1 ? "item" : "items"}
+                  </Badge>
+                </div>
+
+                <RuleRow highlighted={highlight.has("price_floor_pct")}>
+                  <Slider
+                    id="price-floor"
+                    label="Minimum price protection"
+                    value={policy.price_floor_pct}
+                    min={50}
+                    max={100}
+                    format={(v) => `${v}%`}
+                    onChange={(v) => setPolicyField("price_floor_pct", v)}
+                    hint="Buyers cannot push a price below this share of the list price."
+                    disabled={live}
+                  />
+                </RuleRow>
+                <RuleRow highlighted={highlight.has("max_discount_pct")}>
+                  <Slider
+                    id="max-discount"
+                    label="Maximum discount"
+                    value={policy.max_discount_pct}
+                    min={0}
+                    max={50}
+                    format={(v) => `${v}%`}
+                    onChange={(v) => setPolicyField("max_discount_pct", v)}
+                    hint="The most the seller agent may take off any offer."
+                    disabled={live}
+                  />
+                </RuleRow>
+                <RuleRow highlighted={highlight.has("max_qty_per_order")}>
+                  <Slider
+                    id="max-qty"
+                    label="Max items per order"
+                    value={policy.max_qty_per_order}
+                    min={1}
+                    max={10}
+                    onChange={(v) => setPolicyField("max_qty_per_order", v)}
+                    disabled={live}
+                  />
+                </RuleRow>
+                <RuleRow highlighted={highlight.has("gate_above_paise")}>
+                  <Slider
+                    id="gate-above"
+                    label="Ask me above"
+                    value={policy.gate_above_paise}
+                    min={100_000}
+                    max={5_000_000}
+                    step={50_000}
+                    format={(v) => formatINR(v)}
+                    onChange={(v) => setPolicyField("gate_above_paise", v)}
+                    hint="Orders above this wait for your approval in the Control Tower."
+                    disabled={live}
+                  />
+                </RuleRow>
+                <RuleRow highlighted={highlight.has("max_order_value_paise")}>
+                  <Slider
+                    id="max-order"
+                    label="Biggest order allowed"
+                    value={policy.max_order_value_paise}
+                    min={100_000}
+                    max={20_000_000}
+                    step={50_000}
+                    format={(v) => formatINR(v)}
+                    onChange={(v) => setPolicyField("max_order_value_paise", v)}
+                    hint="Anything larger is refused outright."
+                    disabled={live}
+                  />
+                </RuleRow>
+
+                <RuleRow highlighted={highlight.has("category_allowlist")} className="pt-3">
+                  <p className="mb-2 text-sm font-medium text-rzp-text">Categories AI buyers may buy</p>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Category allowlist">
+                    {categories.map((c) => {
+                      const on = policy.category_allowlist.includes(c);
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          aria-pressed={on}
+                          disabled={live}
+                          onClick={() => toggleCategory(c)}
+                          className={cn(
+                            "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors duration-150",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
+                            "disabled:cursor-not-allowed disabled:opacity-60",
+                            on ? "border-rzp-blue bg-rzp-blue text-white hover:bg-rzp-blueHover" : "border-rzp-border bg-white text-rzp-muted hover:border-rzp-blue hover:text-rzp-blueDeep",
+                          )}
+                        >
+                          {on ? <CheckIcon className="h-3.5 w-3.5" /> : null}
+                          {c}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="mt-3 text-xs text-ink/70">
-                    Prices are list prices in rupees. Categories outside the rulebook’s allowlist stay in the catalog but cannot be sold to AI buyers.
+                  <p className={cn("mt-2 text-xs", allowlistEmpty ? ERROR_TEXT : "text-rzp-muted")}>
+                    {allowlistEmpty
+                      ? "No category is on — AI buyers cannot buy anything. Turn one on to sell."
+                      : "Off means an AI buyer asking for it gets a polite DENY and an in-scope alternative."}
                   </p>
-                </CardContent>
-              </Card>
+                </RuleRow>
 
-              <Card>
-                <CardHeader>
-                  <div>
-                    <CardTitle>Rulebook</CardTitle>
-                    <CardDescription className="text-ink/70">AI ne draft kiya, aap approve karo. The policy engine enforces every line — the AI never decides.</CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <RuleRow highlighted={highlight.has("price_floor_pct")}>
-                    <Slider
-                      id="price-floor"
-                      label="Minimum price protection"
-                      value={policy.price_floor_pct}
-                      min={50}
-                      max={100}
-                      format={(v) => `${v}%`}
-                      onChange={(v) => setPolicyField("price_floor_pct", v)}
-                      hint="Buyers cannot push a price below this share of the list price."
-                    />
-                  </RuleRow>
-                  <RuleRow highlighted={highlight.has("max_discount_pct")}>
-                    <Slider
-                      id="max-discount"
-                      label="Maximum discount"
-                      value={policy.max_discount_pct}
-                      min={0}
-                      max={50}
-                      format={(v) => `${v}%`}
-                      onChange={(v) => setPolicyField("max_discount_pct", v)}
-                      hint="The most the seller agent may take off any offer."
-                    />
-                  </RuleRow>
-                  <RuleRow highlighted={highlight.has("max_qty_per_order")}>
-                    <Slider
-                      id="max-qty"
-                      label="Max items per order"
-                      value={policy.max_qty_per_order}
-                      min={1}
-                      max={10}
-                      onChange={(v) => setPolicyField("max_qty_per_order", v)}
-                    />
-                  </RuleRow>
-                  <RuleRow highlighted={highlight.has("gate_above_paise")}>
-                    <Slider
-                      id="gate-above"
-                      label="Ask me above"
-                      value={policy.gate_above_paise}
-                      min={100_000}
-                      max={5_000_000}
-                      step={50_000}
-                      format={(v) => formatINR(v)}
-                      onChange={(v) => setPolicyField("gate_above_paise", v)}
-                      hint="Orders above this wait for your approval in the Control Tower."
-                    />
-                  </RuleRow>
-                  <RuleRow highlighted={highlight.has("max_order_value_paise")}>
-                    <Slider
-                      id="max-order"
-                      label="Biggest order allowed"
-                      value={policy.max_order_value_paise}
-                      min={100_000}
-                      max={20_000_000}
-                      step={50_000}
-                      format={(v) => formatINR(v)}
-                      onChange={(v) => setPolicyField("max_order_value_paise", v)}
-                      hint="Anything larger is refused outright."
-                    />
-                  </RuleRow>
+                <RuleRow highlighted={highlight.has("refund_policy")} className="pt-3">
+                  <Label htmlFor="refund-policy">Return policy</Label>
+                  <Input
+                    id="refund-policy"
+                    value={policy.refund_policy}
+                    onChange={(e) => setPolicyField("refund_policy", e.target.value)}
+                    disabled={live}
+                    placeholder="7-day easy returns on unused items."
+                  />
+                </RuleRow>
 
-                  <RuleRow highlighted={highlight.has("category_allowlist")} className="pt-3">
-                    <p className="mb-2 text-sm font-medium text-ink/80">Categories AI buyers may buy</p>
-                    <div className="flex flex-wrap gap-2" role="group" aria-label="Category allowlist">
-                      {categories.map((c) => {
-                        const on = policy.category_allowlist.includes(c);
-                        return (
-                          <button
-                            key={c}
-                            type="button"
-                            aria-pressed={on}
-                            disabled={live}
-                            onClick={() => toggleCategory(c)}
-                            className={cn(
-                              "rounded-full border px-3 py-1 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
-                              on ? "border-action bg-action text-paper" : "border-ink/20 bg-transparent text-ink/70 hover:border-ink/40",
-                            )}
-                          >
-                            {on ? "✓ " : ""}
-                            {c}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className={cn("mt-2 text-xs", allowlistEmpty ? "text-deny" : "text-ink/70")}>
-                      {allowlistEmpty
-                        ? "No category is on — AI buyers cannot buy anything. Turn one on to sell."
-                        : "Off means an AI buyer asking for it gets a polite DENY and an in-scope alternative."}
-                    </p>
-                  </RuleRow>
-
-                  <RuleRow highlighted={highlight.has("refund_policy")} className="pt-3">
-                    <Label htmlFor="refund-policy">Return policy</Label>
-                    <Input
-                      id="refund-policy"
-                      value={policy.refund_policy}
-                      onChange={(e) => setPolicyField("refund_policy", e.target.value)}
-                      disabled={live}
-                      placeholder="7-day easy returns on unused items."
-                    />
-                  </RuleRow>
-                </CardContent>
-              </Card>
-            </div>
-
-            <section aria-label="Go live" className="mt-6 rounded-xl border border-ink/10 bg-white/60 p-5">
-              <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                <div className="min-w-0">
+                <div className="pt-4">
                   <VoiceMic
                     label="Boliye: 'discount 5% se zyada mat dena' — rulebook awaaz se badlega."
                     onTranscript={(text) => void onReviewTranscript(text)}
                     disabled={voiceBusy || live || confirming}
+                    className="rounded-2xl border border-rzp-border bg-rzp-mist p-4"
                   />
-                  <p className="mt-2 min-h-[1.25rem] text-sm text-ink/75" aria-live="polite">
+                  <p className="mt-2 min-h-[1.25rem] text-sm text-rzp-text" aria-live="polite">
                     {voiceBusy ? "Samajh raha hoon…" : voiceNote}
                   </p>
                 </div>
-                <div className="flex flex-col items-start gap-3 md:items-end">
-                  <Button type="button" size="lg" onClick={() => void approve()} loading={confirming} disabled={live || confirming}>
-                    {live ? "Live ✓" : "Approve & go live"}
-                  </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ---- Sticky action bar ------------------------------------ */}
+          <section aria-label="Go live" className="sticky bottom-4 z-20">
+            <div className="rounded-2xl border border-rzp-border bg-white/90 p-4 shadow-lift backdrop-blur-md sm:px-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  {live ? (
+                    <p className="text-sm text-[#087443]">
+                      <span className="font-semibold">{shopName} is live.</span> AI buyers can now shop inside these rules — every action gets written in the book.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-rzp-muted">
+                      Approving publishes <span className="font-medium text-rzp-text">{shopName}</span> with this catalog and rulebook. Nothing sells before that.
+                    </p>
+                  )}
                   {confirmError ? (
-                    <p className="max-w-sm text-sm text-deny md:text-right" role="alert">
+                    <p className={cn("mt-1 text-sm", ERROR_TEXT)} role="alert">
                       {confirmError}
                     </p>
                   ) : null}
                 </div>
-              </div>
-
-              {live ? (
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 pt-4">
-                  <p className="text-sm text-money">
-                    {merchantName.trim() || DEFAULT_MERCHANT} is live. AI buyers can now shop inside these rules — every action gets written in the book.
-                  </p>
-                  <div className="flex flex-wrap gap-4 text-sm font-medium">
-                    <Link href="/simulator" className="text-action underline-offset-4 hover:underline">
-                      Open the simulator
-                    </Link>
-                    <Link href="/dashboard" className="text-action underline-offset-4 hover:underline">
-                      Open Control Tower
-                    </Link>
-                  </div>
+                <div className="flex flex-wrap items-center gap-3 md:justify-end">
+                  {live ? (
+                    <>
+                      <Link href="/simulator" className={buttonClasses({ variant: "outline-blue", size: "md" })}>
+                        Open the simulator
+                      </Link>
+                      <Link href="/dashboard" className={buttonClasses({ variant: "secondary", size: "md" })}>
+                        Open Control Tower
+                      </Link>
+                    </>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant={live ? "money" : "primary"}
+                    onClick={() => void approve()}
+                    loading={confirming}
+                    disabled={live || confirming}
+                    className={cn(live && "disabled:opacity-100")}
+                  >
+                    {live ? "Live ✓" : "Approve & go live"}
+                  </Button>
                 </div>
-              ) : null}
-            </section>
-          </>
-        ) : null}
-      </main>
-    </>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </AppShell>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Pieces                                                             */
+/* ------------------------------------------------------------------ */
+
+const STEPS: ReadonlyArray<{ key: Step; n: number; label: string }> = [
+  { key: "catalog", n: 1, label: "Catalog" },
+  { key: "review", n: 2, label: "Rulebook" },
+];
+
+function Stepper({ step, live }: { step: Step; live: boolean }) {
+  return (
+    <nav aria-label="Onboarding progress" className="flex flex-wrap items-center gap-2 sm:gap-3">
+      {STEPS.map((s, i) => {
+        const active = step === s.key;
+        const done = s.key === "catalog" ? step === "review" : live;
+        return (
+          <Fragment key={s.key}>
+            {i > 0 ? <span aria-hidden="true" className={cn("h-px w-6 sm:w-10", step === "review" ? "bg-rzp-blue" : "bg-rzp-border")} /> : null}
+            <span
+              aria-current={active ? "step" : undefined}
+              className={cn(
+                "inline-flex h-8 items-center gap-2 rounded-full border px-3 text-xs font-semibold tracking-wide",
+                active && "border-blue-200 bg-blue-50 text-blue-700",
+                !active && done && "border-rzp-green/30 bg-rzp-green/10 text-[#087443]",
+                !active && !done && "border-rzp-border bg-white text-rzp-muted",
+              )}
+            >
+              {done ? <CheckIcon className="h-3.5 w-3.5" /> : <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />}
+              {`Step ${s.n} of 2 · ${s.label}`}
+            </span>
+          </Fragment>
+        );
+      })}
+    </nav>
+  );
+}
+
+function DraftingSkeleton() {
+  const rows = [0, 1, 2, 3, 4, 5];
+  const rules = [0, 1, 2, 3, 4];
+  return (
+    <div className="fade-up space-y-6" aria-busy="true">
+      <p role="status" className="flex items-center gap-2 text-sm text-rzp-muted">
+        <Spinner className="h-4 w-4 text-rzp-blue" />
+        Reading your catalog and drafting the rulebook…
+      </p>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
+        <Card>
+          <CardContent className="pt-5">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="mt-2 h-3.5 w-64" />
+            <div className="mt-5 space-y-3">
+              {rows.map((r, i) => (
+                <div key={r} className="fade-up flex items-center gap-3" style={{ "--delay": `${i * 60}ms` } as CSSProperties}>
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <Skeleton className={cn("h-8", i % 2 ? "w-1/2" : "w-2/5")} />
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <Skeleton className="ml-auto h-8 w-20" />
+                  <Skeleton className="h-8 w-14" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="mt-2 h-3.5 w-56" />
+            <div className="mt-4 flex gap-2">
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-6 w-28 rounded-full" />
+              <Skeleton className="h-6 w-32 rounded-full" />
+            </div>
+            <div className="mt-5 space-y-5">
+              {rules.map((r) => (
+                <div key={r}>
+                  <div className="flex justify-between">
+                    <Skeleton className="h-3.5 w-40" />
+                    <Skeleton className="h-3.5 w-12" />
+                  </div>
+                  <Skeleton className="mt-2 h-2 w-full rounded-full" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }
 
 function RuleRow({ highlighted, className, children }: { highlighted: boolean; className?: string; children: React.ReactNode }) {
-  return <div className={cn("-mx-2 rounded-lg px-2 transition-colors", highlighted && "bg-turmeric/10", className)}>{children}</div>;
+  return (
+    <div className={cn("-mx-2 rounded-xl px-2 transition-[background-color,box-shadow] duration-300", highlighted && "bg-rzp-amber/10 ring-1 ring-rzp-amber/40", className)}>
+      {children}
+    </div>
+  );
+}
+
+/* ---- tiny inline icons ----------------------------------------------- */
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 16V5" />
+      <path d="m7.5 9.5 4.5-4.5 4.5 4.5" />
+      <path d="M4.5 15.5v2a2.5 2.5 0 0 0 2.5 2.5h10a2.5 2.5 0 0 0 2.5-2.5v-2" />
+    </svg>
+  );
+}
+
+function SparkIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M12 2c.6 6 3.4 8.8 10 10-6.6 1.2-9.4 4-10 10-.6-6-3.4-8.8-10-10 6.6-1.2 9.4-4 10-10Z" />
+    </svg>
+  );
 }

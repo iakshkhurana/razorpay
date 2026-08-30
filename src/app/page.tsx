@@ -1,37 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { HeroCluster } from "@/components/landing/HeroCluster";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { MarketingFooter } from "@/components/landing/MarketingFooter";
+import { MarketingHeader } from "@/components/landing/MarketingHeader";
+import { ProductCards } from "@/components/landing/ProductCards";
+import { RailsStrip } from "@/components/landing/RailsStrip";
+import { StatsBand } from "@/components/landing/StatsBand";
 import { MiniLedger } from "@/components/MiniLedger";
-import { SiteHeader } from "@/components/SiteHeader";
+import { buttonClasses } from "@/components/ui/button";
 import { api, type StatsResponse } from "@/lib/demo/client";
 import { clearTourStep, isTourActive, useTourAction, type TourEventDetail } from "@/lib/tour/client";
 import { cn } from "@/lib/utils";
 
-const LINK_BUTTON = "inline-flex h-12 items-center justify-center rounded-xl border px-6 text-base font-medium transition-colors";
-const LINK_PRIMARY = "border-action bg-action text-paper hover:bg-action/90";
-const LINK_GHOST = "border-transparent bg-transparent text-action hover:bg-action/5";
-
-const PIPELINE: ReadonlyArray<{ title: string; body: string }> = [
-  {
-    title: "Onboard",
-    body: "Paste a catalog URL or CSV, or just say the rules aloud. AgentGate drafts the price floor, discount cap and order limits; the shopkeeper approves them. Humans set the rules.",
-  },
-  {
-    title: "Agents negotiate inside the rules",
-    body: "An AI buyer arrives with a signed mandate. The seller agent searches, bundles and counters — but every offer passes a deterministic policy engine first. The model never touches money.",
-  },
-  {
-    title: "Every rupee written down",
-    body: "Each verdict — allowed, countered, gated, denied, paid or failed — lands in a hash-chained ledger with its reason. The Control Tower reads it back in plain words or raw JSON.",
-  },
-];
-
 type StatsState = { kind: "loading" } | { kind: "ready"; data: StatsResponse } | { kind: "error"; message: string };
 
-function signedPct(n: number): string {
-  const rounded = Math.round(n);
-  return `${rounded >= 0 ? "+" : ""}${rounded}%`;
+type DelayStyle = CSSProperties & { "--delay"?: string };
+
+/** fade-up stagger for the hero children */
+function delay(ms: number): DelayStyle {
+  return { "--delay": `${ms}ms` };
 }
 
 export default function LandingPage() {
@@ -59,84 +49,106 @@ export default function LandingPage() {
   }, []);
 
   const data = stats.kind === "ready" ? stats.data : null;
-  const evalFacts = data?.eval ?? null;
   const merchant = data?.merchant ?? null;
 
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto max-w-6xl px-6">
-        <section className="pb-16 pt-14 sm:pt-20">
-          <h1 className="font-display text-6xl font-bold leading-[0.95] tracking-tight sm:text-8xl">Har paisa, likha hua.</h1>
-          <p className="mt-6 max-w-2xl text-lg text-ink/70 sm:text-xl">Every rupee your AI sells — explained, bounded, and written down.</p>
+    <div className="min-h-screen bg-white text-rzp-text">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-rzp-navy focus:shadow-card"
+      >
+        Skip to content
+      </a>
 
-          <MiniLedger restartKey={restartKey} className="mt-10 max-w-2xl" />
+      <MarketingHeader />
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/onboard" className={cn(LINK_BUTTON, LINK_PRIMARY)}>
-              Onboard a shop
-            </Link>
-            <Link href="/?tour=1" onClick={clearTourStep} className={cn(LINK_BUTTON, LINK_GHOST)}>
-              Watch the Grand Tour
-            </Link>
-          </div>
+      <main id="main">
+        {/* ---------------------------------------------------------------- */}
+        {/*  Hero                                                            */}
+        {/* ---------------------------------------------------------------- */}
+        <section className="bg-hero relative -mt-16 overflow-hidden pb-24 pt-28 sm:pt-32 lg:pb-28 lg:pt-36" aria-labelledby="hero-heading">
+          <div aria-hidden="true" className="bg-dots-light absolute inset-0" />
+          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/15 to-transparent" />
 
-          {evalFacts ? (
-            <p className="mt-10 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-ink/70" aria-label="Evidence from the last eval run">
-              <Fact value={String(evalFacts.breaches)} label={`${evalFacts.breaches === 1 ? "breach" : "breaches"} across ${evalFacts.attacks} attacks`} tone={evalFacts.breaches === 0 ? "money" : "deny"} />
-              <Dot />
-              <Fact value={`${Math.round(evalFacts.explained_pct)}%`} label="explained" />
-              <Dot />
-              <Fact value={signedPct(evalFacts.revenue_uplift_pct)} label="revenue" tone={evalFacts.revenue_uplift_pct >= 0 ? "money" : "deny"} />
-            </p>
-          ) : null}
+          <div className="relative mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-10">
+            <div className="min-w-0">
+              <p
+                className="fade-up inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-semibold text-rzp-navy shadow-sm backdrop-blur"
+                style={delay(0)}
+              >
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-rzp-blue" />
+                Razorpay Hackathon · Track 01 · Agentic commerce
+              </p>
 
-          {data ? (
-            <p className="mt-6 text-sm text-ink/70">
-              {merchant?.live ? (
-                <>
-                  {merchant.name} is live for AI buyers · payments: <span className="font-mono">{data.modes.payments}</span>
-                </>
-              ) : (
-                "No shop is live yet — onboard one to open the book."
-              )}
-            </p>
-          ) : null}
+              <h1
+                id="hero-heading"
+                className="fade-up mt-6 font-display text-6xl font-bold leading-[0.95] tracking-tight text-rzp-navy sm:text-7xl"
+                style={delay(80)}
+              >
+                Har paisa, likha hua.
+              </h1>
+              <p className="fade-up mt-5 max-w-xl text-lg leading-relaxed text-rzp-navy/85 sm:text-xl" style={delay(160)}>
+                Every rupee your AI sells — explained, bounded, and written down.
+              </p>
 
-          {stats.kind === "error" ? <p className="mt-6 text-sm text-ink/70">{stats.message}</p> : null}
-        </section>
-
-        <section aria-labelledby="pipeline-heading" className="border-t border-ink/10 py-16">
-          <h2 id="pipeline-heading" className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-            How the book gets written
-          </h2>
-          <div className="mt-8 grid gap-10 sm:grid-cols-3 sm:gap-8">
-            {PIPELINE.map((col) => (
-              <div key={col.title}>
-                <h3 className="font-display text-lg font-semibold tracking-tight">{col.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink/70">{col.body}</p>
+              <div className="fade-up mt-8 flex flex-wrap items-center gap-3" style={delay(240)}>
+                <Link
+                  href="/onboard"
+                  className={buttonClasses({
+                    variant: "primary",
+                    size: "lg",
+                    className: "border-rzp-navy bg-rzp-navy shadow-card hover:border-rzp-blueDeep hover:bg-rzp-blueDeep",
+                  })}
+                >
+                  Onboard a shop
+                </Link>
+                <Link
+                  href="/?tour=1"
+                  onClick={clearTourStep}
+                  className={buttonClasses({
+                    variant: "secondary",
+                    size: "lg",
+                    className: "border-white/70 bg-white/80 text-rzp-navy backdrop-blur hover:border-white hover:bg-white",
+                  })}
+                >
+                  Watch the Grand Tour
+                </Link>
               </div>
-            ))}
+
+              <div className="fade-up mt-10 max-w-xl" style={delay(320)}>
+                <MiniLedger frame="glass" restartKey={restartKey} />
+              </div>
+
+              <p className="mt-4 min-h-[1.25rem] text-sm text-rzp-navy/80" aria-live="polite">
+                {data ? (
+                  merchant?.live ? (
+                    <>
+                      {merchant.name} ki dukaan is live for AI buyers · payments on{" "}
+                      <span className="font-mono">{data.modes.payments === "razorpay" ? "Razorpay test rails" : "the mock adapter"}</span>
+                    </>
+                  ) : (
+                    "No shop is live yet — onboard one to open the book."
+                  )
+                ) : stats.kind === "error" ? (
+                  stats.message
+                ) : null}
+              </p>
+            </div>
+
+            <HeroCluster className={cn("fade-up lg:justify-self-end")} />
           </div>
         </section>
 
-        <footer className="border-t border-ink/10 py-8 text-sm text-ink/70">Built for Razorpay Hackathon · Track 01</footer>
+        <StatsBand stats={data} loading={stats.kind === "loading"} />
+
+        <ProductCards />
+
+        <HowItWorks />
+
+        <RailsStrip payments={data?.modes.payments ?? null} />
       </main>
-    </>
-  );
-}
 
-function Fact({ value, label, tone }: { value: string; label: string; tone?: "money" | "deny" }) {
-  return (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span className={cn("font-mono text-base font-semibold text-ink tnum", tone === "money" && "text-money", tone === "deny" && "text-deny")}>{value}</span>
-      <span>{label}</span>
-    </span>
-  );
-}
-
-function Dot() {
-  return (
-    <span aria-hidden="true">·</span>
+      <MarketingFooter />
+    </div>
   );
 }

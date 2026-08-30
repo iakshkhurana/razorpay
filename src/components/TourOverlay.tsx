@@ -143,32 +143,42 @@ export function TourOverlay() {
   if (!active || index === null) return null;
 
   const step = stepAt(index);
+  /* steps completed so far, out of TOTAL — the end card shows a full line */
+  const progress = step ? step.n : TOTAL;
+  const progressPct = Math.round((progress / TOTAL) * 100);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-ink/15" aria-hidden="true" />
+      <div className="absolute inset-0 bg-rzp-navy/20" aria-hidden="true" />
       <aside
         aria-label="Grand Tour"
-        className="pointer-events-auto absolute inset-x-4 bottom-20 rounded-xl border border-ink/10 bg-paper shadow-sm sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[28rem]"
+        className="glass pointer-events-auto absolute inset-x-4 bottom-20 overflow-hidden rounded-2xl shadow-lift sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[28rem]"
       >
+        <div
+          className="h-1 w-full bg-rzp-blue/15"
+          role="progressbar"
+          aria-label="Tour progress"
+          aria-valuemin={0}
+          aria-valuemax={TOTAL}
+          aria-valuenow={progress}
+          aria-valuetext={`Step ${progress} of ${TOTAL}`}
+        >
+          <div className="h-full rounded-r-full bg-rzp-blue transition-[width] duration-500 ease-out" style={{ width: `${progressPct}%` }} />
+        </div>
+
         {step ? (
           <div className="px-5 pb-4 pt-4">
             <div className="flex items-center justify-between gap-4">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink/70">
-                Grand Tour <span className="ml-2 font-mono normal-case tracking-normal tnum">{step.n} / {TOTAL}</span>
+              <p className="inline-flex items-center gap-2 rounded-full bg-rzp-blue/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-rzp-blueDeep">
+                Grand Tour
+                <span className="font-mono normal-case tracking-normal tnum">
+                  {step.n} / {TOTAL}
+                </span>
               </p>
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Close tour"
-                title="Close tour (Esc)"
-                className="rounded-lg px-2 py-0.5 text-lg leading-none text-ink/70 hover:bg-ink/5 hover:text-ink"
-              >
-                ×
-              </button>
+              <CloseButton onClick={close} />
             </div>
 
-            <p aria-live="polite" className="mt-2 font-display text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
+            <p aria-live="polite" className="mt-3 font-display text-xl font-semibold leading-snug tracking-tight text-rzp-text sm:text-2xl">
               {step.caption}
             </p>
 
@@ -177,43 +187,40 @@ export function TourOverlay() {
                 {TOUR_STEPS.map((s, i) => (
                   <span
                     key={s.n}
-                    className={cn("block h-2 w-2 rounded-full", i === index ? "bg-action" : i < index ? "bg-ink/40" : "bg-ink/15")}
+                    className={cn(
+                      "block h-1.5 rounded-full transition-[width,background-color] duration-300",
+                      i === index ? "w-4 bg-rzp-blue" : i < index ? "w-1.5 bg-rzp-blue/50" : "w-1.5 bg-rzp-navy/15",
+                    )}
                   />
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => goTo(index - 1)} disabled={index === 0}>
+                <Button type="button" variant="secondary" size="sm" className="rounded-full px-3.5" onClick={() => goTo(index - 1)} disabled={index === 0}>
                   Back
                 </Button>
-                <Button ref={nextRef} type="button" variant="primary" size="sm" onClick={() => goTo(index + 1)}>
+                <Button ref={nextRef} type="button" variant="primary" size="sm" className="rounded-full px-4" onClick={() => goTo(index + 1)}>
                   Next
                 </Button>
               </div>
             </div>
           </div>
         ) : (
-          <div className="px-5 pb-5 pt-5">
+          <div className="px-5 pb-5 pt-4">
             <div className="flex items-start justify-between gap-4">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink/70">Grand Tour · complete</p>
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Close tour"
-                title="Close tour (Esc)"
-                className="rounded-lg px-2 py-0.5 text-lg leading-none text-ink/70 hover:bg-ink/5 hover:text-ink"
-              >
-                ×
-              </button>
+              <p className="inline-flex items-center gap-2 rounded-full bg-rzp-green/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#087443]">
+                Grand Tour · complete
+              </p>
+              <CloseButton onClick={close} />
             </div>
-            <p aria-live="polite" className="mt-2 font-display text-3xl font-bold tracking-tight">
+            <p aria-live="polite" className="mt-3 font-display text-3xl font-bold tracking-tight text-rzp-text">
               {TOUR_END_CARD}
             </p>
-            <p className="mt-2 text-sm text-ink/70">Every rupee your AI sells — explained, bounded, and written down.</p>
+            <p className="mt-2 text-sm text-rzp-muted">Every rupee your AI sells — explained, bounded, and written down.</p>
             <div className="mt-5 flex items-center gap-2">
-              <Button ref={restartRef} type="button" variant="primary" size="md" onClick={() => goTo(0)}>
+              <Button ref={restartRef} type="button" variant="primary" size="md" className="rounded-full px-5" onClick={() => goTo(0)}>
                 Restart tour
               </Button>
-              <Button type="button" variant="outline" size="md" onClick={close}>
+              <Button type="button" variant="secondary" size="md" className="rounded-full px-5" onClick={close}>
                 Close tour
               </Button>
             </div>
@@ -221,5 +228,21 @@ export function TourOverlay() {
         )}
       </aside>
     </div>
+  );
+}
+
+function CloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Close tour"
+      title="Close tour (Esc)"
+      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-rzp-muted transition-colors hover:bg-rzp-navy/10 hover:text-rzp-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2"
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6 6 18" />
+      </svg>
+    </button>
   );
 }

@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
  * Round mic button on the Web Speech API (hi-IN). Renders nothing when the
  * browser has no recognizer or the user refuses the mic: voice only edits
  * policy fields before approval, so it never blocks the flow.
+ *
+ * Look: blue ring while idle, red pulse while listening.
  */
 
 interface AlternativeLike {
@@ -167,9 +169,12 @@ export function VoiceMic({
         aria-pressed={listening}
         aria-label={listening ? "Sunna band karein" : "Boliye — policy ko awaaz se set karein"}
         className={cn(
-          "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 bg-white/70 transition-colors",
+          "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 bg-white transition-[color,border-color,background-color,box-shadow] duration-150",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          listening ? "animate-mic-pulse border-deny text-deny" : "border-ink/20 text-ink hover:border-action hover:text-action",
+          listening
+            ? "animate-mic-pulse border-rzp-red bg-rzp-red/10 text-[#B3262C]"
+            : "border-rzp-blue text-rzp-blueDeep shadow-[0_0_0_4px_rgba(51,149,255,0.14)] hover:bg-rzp-blue/10 hover:shadow-[0_0_0_6px_rgba(51,149,255,0.18)]",
         )}
       >
         <MicIcon />
@@ -177,13 +182,13 @@ export function VoiceMic({
       <div className="min-w-0 text-sm" aria-live="polite">
         {listening ? (
           <>
-            <p className="font-medium text-deny">Sun raha hoon…</p>
-            {interim ? <p className="truncate text-ink/70">{interim}</p> : null}
+            <p className="font-medium text-[#B3262C]">Sun raha hoon…</p>
+            {interim ? <p className="truncate text-rzp-muted">{interim}</p> : null}
           </>
         ) : (
-          <p className="text-ink/70">{label}</p>
+          <p className="text-rzp-muted">{label}</p>
         )}
-        {note && !listening ? <p className="mt-0.5 text-xs text-deny">{note}</p> : null}
+        {note && !listening ? <p className="mt-0.5 text-xs text-[#B3262C]">{note}</p> : null}
       </div>
     </div>
   );

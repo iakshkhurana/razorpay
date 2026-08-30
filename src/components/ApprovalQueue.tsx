@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { ShieldCheck } from "@/components/illustrations";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonClasses } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { VerdictStamp } from "@/components/VerdictStamp";
 import { ApiError, api, type OrderView } from "@/lib/demo/client";
@@ -33,12 +36,30 @@ function describeError(err: unknown): string {
   return "Could not reach the shop. Check that the app is running and try again.";
 }
 
-function SectionLabel({ children, count }: { children: React.ReactNode; count?: number }) {
+function OrderHeadline({ order }: { order: OrderView }) {
   return (
-    <h2 className="flex items-baseline gap-2 font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/70">
-      {children}
-      {typeof count === "number" && count > 0 ? <span className="font-mono text-[11px] tracking-normal text-ink/70 tnum">{count}</span> : null}
-    </h2>
+    <div className="min-w-0">
+      <h3 className="font-display text-lg font-semibold leading-tight tracking-tight text-rzp-text">
+        <span className="font-mono tnum">{formatINR(order.amount_paise)}</span> {cardTitle(order)}
+      </h3>
+      <p className="mt-1 text-sm text-rzp-muted">
+        {order.sku_names.join(" + ")}
+        {order.qty > 1 ? ` × ${order.qty}` : ""}
+      </p>
+    </div>
+  );
+}
+
+function QueueSkeleton() {
+  return (
+    <div className="space-y-3" aria-hidden="true">
+      <Skeleton className="h-6 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <div className="flex gap-2 pt-1">
+        <Skeleton className="h-8 w-28" />
+        <Skeleton className="h-8 w-24" />
+      </div>
+    </div>
   );
 }
 
@@ -75,62 +96,54 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
 
   return (
     <div className="space-y-6">
-      <section aria-labelledby="approval-queue-heading" className="space-y-3">
-        <SectionLabel count={pending.length}>
-          <span id="approval-queue-heading">Approval queue</span>
-        </SectionLabel>
-
-        {!loaded ? (
-          <Card>
-            <CardContent className="py-5 text-sm text-ink/70">Loading the queue…</CardContent>
-          </Card>
-        ) : pending.length === 0 ? (
-          <Card>
-            <CardContent className="py-5">
-              <p className="text-sm font-medium">Koi order aapka intezaar nahi kar raha.</p>
-              <p className="mt-1 text-sm text-ink/70">
-                Orders above the gate land here for your call — the AI never approves them.{" "}
-                <Link href="/simulator" className="text-action underline-offset-4 hover:underline">
-                  Stage one in the simulator
-                </Link>
-                .
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <ul className="space-y-3" aria-live="polite">
-            {pending.map((order) => {
-              const working = busy[order.id];
-              return (
-                <li key={order.id}>
-                  <Card className="animate-write-in">
-                    <CardContent className="space-y-3 pt-5">
+      <section aria-labelledby="approval-queue-heading">
+        <Card aria-busy={!loaded || undefined}>
+          <CardHeader>
+            <div className="min-w-0">
+              <CardTitle id="approval-queue-heading">Owner&apos;s call</CardTitle>
+              <CardDescription className="mt-0.5">Orders above the gate wait for you. The AI never decides these.</CardDescription>
+            </div>
+            {loaded && pending.length > 0 ? (
+              <Badge tone="violet" dot className="shrink-0">
+                {pending.length} waiting
+              </Badge>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {!loaded ? (
+              <QueueSkeleton />
+            ) : pending.length === 0 ? (
+              <div className="flex items-center gap-4">
+                <ShieldCheck className="w-20 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-rzp-text">Koi order aapka intezaar nahi kar raha.</p>
+                  <p className="mt-1 text-sm text-rzp-muted">
+                    Big orders land here for your call.{" "}
+                    <Link href="/simulator" className="font-medium text-rzp-blueDeep underline-offset-4 hover:underline">
+                      Stage one in the simulator
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ul className="space-y-3" aria-live="polite">
+                {pending.map((order) => {
+                  const working = busy[order.id];
+                  return (
+                    <li key={order.id} className="animate-write-in rounded-xl border border-rzp-violet/25 bg-rzp-violet/5 p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="font-display text-lg font-semibold leading-tight tracking-tight">
-                            <span className="font-mono tnum">{formatINR(order.amount_paise)}</span> {cardTitle(order)}
-                          </h3>
-                          <p className="mt-1 text-sm text-ink/70">
-                            {order.sku_names.join(" + ")}
-                            {order.qty > 1 ? ` × ${order.qty}` : ""}
-                          </p>
-                        </div>
-                        <VerdictStamp kind="GATE" size="sm" animate={false} />
+                        <OrderHeadline order={order} />
+                        <VerdictStamp kind="GATE" size="sm" animate={false} className="bg-white/80" />
                       </div>
-                      <p className="text-xs text-ink/70">Big order — you decide. Either answer is written into the book.</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => void decide(order, "approve")}
-                          loading={working === "approve"}
-                          disabled={Boolean(working)}
-                        >
+                      <p className="mt-2 text-xs text-rzp-muted">Big order — you decide. Either answer is written into the book.</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button size="sm" variant="primary" onClick={() => void decide(order, "approve")} loading={working === "approve"} disabled={Boolean(working)}>
                           Approve order
                         </Button>
                         <Button
                           size="sm"
-                          variant="deny-outline"
+                          variant="danger-outline"
                           onClick={() => void decide(order, "reject")}
                           loading={working === "reject"}
                           disabled={Boolean(working)}
@@ -139,60 +152,62 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
                         </Button>
                       </div>
                       {errors[order.id] ? (
-                        <p className="text-sm text-deny" role="alert">
+                        <p className="mt-2 text-sm text-[#B3262C]" role="alert">
                           {errors[order.id]}
                         </p>
                       ) : null}
-                    </CardContent>
-                  </Card>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </section>
 
-      {held.length > 0 ? (
-        <section aria-labelledby="held-orders-heading" className="space-y-3">
-          <SectionLabel count={held.length}>
-            <span id="held-orders-heading">Held orders</span>
-          </SectionLabel>
-          <ul className="space-y-3">
-            {held.map((order) => (
-              <li key={order.id}>
-                <Card className="animate-write-in">
-                  <CardContent className="space-y-3 pt-5">
+      <section aria-labelledby="held-orders-heading">
+        <Card aria-busy={!loaded || undefined}>
+          <CardHeader>
+            <div className="min-w-0">
+              <CardTitle id="held-orders-heading">Held &amp; recovering</CardTitle>
+              <CardDescription className="mt-0.5">When the bank fails a payment, the order parks here with a backup link.</CardDescription>
+            </div>
+            {loaded && held.length > 0 ? (
+              <Badge tone="amber" dot className="shrink-0">
+                {held.length} held
+              </Badge>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {!loaded ? (
+              <Skeleton className="h-4 w-3/4" />
+            ) : held.length === 0 ? (
+              <p className="text-sm text-rzp-muted">Koi payment atki nahi hai. Nothing is lost when one fails — it recovers from here.</p>
+            ) : (
+              <ul className="space-y-3" aria-live="polite">
+                {held.map((order) => (
+                  <li key={order.id} className="animate-write-in rounded-xl border border-rzp-amber/40 bg-rzp-amber/5 p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="font-display text-lg font-semibold leading-tight tracking-tight">
-                          <span className="font-mono tnum">{formatINR(order.amount_paise)}</span> {cardTitle(order)}
-                        </h3>
-                        <p className="mt-1 text-sm text-ink/70">{order.sku_names.join(" + ")}</p>
-                      </div>
-                      <VerdictStamp kind="HELD" size="sm" animate={false} />
+                      <OrderHeadline order={order} />
+                      <VerdictStamp kind="HELD" size="sm" animate={false} className="bg-white/80" />
                     </div>
-                    <p className="text-sm">
+                    <p className="mt-2 text-sm text-rzp-text">
                       {order.payment_url
                         ? "Payment failed at the bank. A backup payment link is ready below."
                         : "Payment failed at the bank. A backup payment link is on its way — this card updates on its own."}
                     </p>
                     {order.payment_url ? (
-                      <a
-                        href={order.payment_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex h-8 items-center rounded-lg border border-action px-3 text-sm font-medium text-action hover:bg-action/5"
-                      >
+                      <a href={order.payment_url} target="_blank" rel="noreferrer" className={buttonClasses({ variant: "outline-blue", size: "sm", className: "mt-3" })}>
                         Open backup link
                       </a>
                     ) : null}
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
