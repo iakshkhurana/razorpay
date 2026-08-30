@@ -757,9 +757,9 @@ export function AppShell({ title, subtitle, actions, headerExtra, children, sect
             <Wordmark variant="dark" size={32} />
           </div>
 
-          <NotchTab tone="dark" className="hidden sm:block">
+          <div className="absolute left-1/2 hidden -translate-x-1/2 sm:block">
             <TestModePill payments={payments} />
-          </NotchTab>
+          </div>
 
           <div className="flex items-center gap-2">
             <TestModePill payments={payments} className="sm:hidden" />
