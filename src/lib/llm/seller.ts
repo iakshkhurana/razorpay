@@ -215,7 +215,7 @@ async function deterministicTurn(input: SellerTurnInput): Promise<SellerTurnResu
       let is_bundle = false;
       if (qty === 1 && sku_ids.length === 1 && !session.upsell_done && proposed === undefined) {
         const addon = pickUpsell(anchor, catalog, session.messages.map((m) => m.content).join(" "));
-        if (addon) {
+        if (addon && anchor.price_paise + addon.price_paise <= mandate.spend_cap_paise) {
           sku_ids = [anchor.id, addon.id];
           is_bundle = true;
           session.upsell_done = true;
