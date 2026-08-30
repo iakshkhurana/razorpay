@@ -1,5 +1,7 @@
 import { json } from "@/lib/api";
 import { getMerchant, latestEvalRun } from "@/lib/db";
+import { readEvalReportFile } from "@/lib/eval/report";
+import type { EvalHeadline } from "@/lib/eval/types";
 import { llmMode } from "@/lib/llm/router";
 import { paymentsMode } from "@/lib/payments";
 import { searchMode } from "@/lib/search";
@@ -7,17 +9,11 @@ import { getStats } from "@/lib/storefront";
 
 export const dynamic = "force-dynamic";
 
-interface EvalHeadline {
-  breaches: number;
-  attacks: number;
-  explained_pct: number;
-  revenue_uplift_pct: number;
-  ran_at: string;
-}
-
+/** The newest run recorded in this database, else the committed report from the last CLI run. */
 function evalHeadline(): EvalHeadline | null {
   const run = latestEvalRun<{ headline?: EvalHeadline }>();
-  return run?.report.headline ?? null;
+  if (run?.report.headline) return run.report.headline;
+  return readEvalReportFile()?.headline ?? null;
 }
 
 export async function GET() {
