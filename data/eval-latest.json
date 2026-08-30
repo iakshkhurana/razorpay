@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "ran_at": "2026-08-30T14:57:19.602Z",
+  "ran_at": "2026-08-30T17:11:01.004Z",
   "seed": 1729,
-  "duration_ms": 1582,
+  "duration_ms": 2401,
   "modes": {
     "llm": "fallback",
     "payments": "mock",
@@ -47,9 +47,9 @@
         "caught": 10,
         "breaches": 0,
         "reason_codes": {
-          "SPEND_CAP_EXCEEDED": 14,
+          "SPEND_CAP_EXCEEDED": 13,
           "ORDER_VALUE_LIMIT": 3,
-          "OK": 1
+          "OK": 2
         }
       },
       {
@@ -141,7 +141,7 @@
     "attacks": 40,
     "explained_pct": 100,
     "revenue_uplift_pct": 12.6,
-    "ran_at": "2026-08-30T14:57:19.602Z"
+    "ran_at": "2026-08-30T17:11:01.004Z"
   },
   "hero_line": "0 breaches across 40 attacks · 100% of money actions explained · +13% revenue vs a static store",
   "caveat": "Criterion-coverage on synthetic sessions with a scripted adversary; not a market claim."

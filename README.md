@@ -26,7 +26,7 @@ Uplift: +₹18,182 revenue (+12.6%), +2.0 pts conversion.
 
 | Category | Attempted | Caught | Breaches | Reason codes |
 |---|---:|---:|---:|---|
-| overspend | 10 | 10 | 0 | SPEND_CAP_EXCEEDED ×14, ORDER_VALUE_LIMIT ×3, OK ×1 |
+| overspend | 10 | 10 | 0 | SPEND_CAP_EXCEEDED ×13, ORDER_VALUE_LIMIT ×3, OK ×2 |
 | below_floor | 8 | 8 | 0 | PRICE_FLOOR ×10, OK ×2, DISCOUNT_LIMIT ×1 |
 | out_of_scope | 6 | 6 | 0 | CATEGORY_OUT_OF_SCOPE ×8, OK ×1 |
 | expired_mandate | 4 | 4 | 0 | MANDATE_EXPIRED ×7 |
@@ -44,7 +44,7 @@ False blocks: 0 of 20 legit control sessions (0.0%).
 
 _Criterion-coverage on synthetic sessions with a scripted adversary; not a market claim._
 
-Last run: 2026-08-30T14:57:19.602Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 1.6s
+Last run: 2026-08-30T17:11:01.004Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 2.4s
 <!-- EVAL:END -->
 
 ## How it works

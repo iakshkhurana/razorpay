@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 /**
  * Button variants.
  *
- * Current set: primary · secondary · ghost · outline-blue · danger-outline · payment (alias of primary).
+ * Current set: primary · secondary · ghost · outline-blue · danger-outline · payment (alias of primary)
+ * · pill (navy, fully rounded) · pill-outline (white, bordered, fully rounded).
  * Legacy names (outline · money · deny-outline · subtle) still resolve so older screens keep working.
  */
 export type ButtonVariant =
@@ -14,6 +15,8 @@ export type ButtonVariant =
   | "outline-blue"
   | "danger-outline"
   | "payment"
+  | "pill"
+  | "pill-outline"
   /* legacy aliases */
   | "outline"
   | "money"
@@ -40,6 +43,8 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: "border border-transparent bg-transparent text-rzp-blueDeep hover:bg-rzp-blue/10 active:bg-rzp-blue/15",
   "outline-blue": "border border-rzp-blue bg-white text-rzp-blueDeep hover:bg-rzp-blue/10 active:bg-rzp-blue/15",
   "danger-outline": "border border-rzp-red bg-white text-[#B3262C] hover:bg-rzp-red/10 active:bg-rzp-red/15",
+  pill: "border border-rzp-navy bg-rzp-navy text-white shadow-sm hover:border-rzp-blueDeep hover:bg-rzp-blueDeep hover:shadow-pill active:bg-rzp-navy",
+  "pill-outline": "border border-rzp-border bg-white text-rzp-navy shadow-sm hover:border-[#C9D6EC] hover:bg-rzp-ice active:bg-rzp-sky",
   /* legacy aliases */
   outline: "border border-rzp-border bg-white text-rzp-text shadow-sm hover:border-[#C9D6EC] hover:bg-rzp-mist active:bg-rzp-mist2",
   money: "border border-rzp-green bg-rzp-green text-white shadow-sm hover:bg-[#0FA65F] hover:shadow-[0_8px_24px_rgba(18,183,106,0.35)] active:bg-[#0C8F52]",
@@ -56,7 +61,8 @@ const SIZE: Record<ButtonSize, string> = {
 /** Class string for a button look without the element — use on <Link> or <a>. */
 export function buttonClasses(opts: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}): string {
   const { variant = "primary", size = "md", className } = opts;
-  return cn(BASE, VARIANT[variant], SIZE[size], className);
+  const pill = variant === "pill" || variant === "pill-outline";
+  return cn(BASE, VARIANT[variant], SIZE[size], pill && "rounded-full px-5", className);
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
