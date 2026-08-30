@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   type LedgerEntry,
@@ -23,8 +24,11 @@ type Db = Database.Database;
 
 let db: Db | null = null;
 
+/** Serverless filesystems are read-only outside the OS temp dir, so Vercel gets a temp database. */
 export function dbPath(): string {
-  return process.env.AGENTGATE_DB_PATH ?? path.join(process.cwd(), "data", "agentgate.db");
+  if (process.env.AGENTGATE_DB_PATH) return process.env.AGENTGATE_DB_PATH;
+  if (process.env.VERCEL) return path.join(os.tmpdir(), "agentgate", "agentgate.db");
+  return path.join(process.cwd(), "data", "agentgate.db");
 }
 
 const SCHEMA = `
