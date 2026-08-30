@@ -252,18 +252,19 @@ async function deterministicTurn(input: SellerTurnInput): Promise<SellerTurnResu
   if (hits.length === 0 && lastOffer) {
     hits = await searchCatalog(lastOffer.sku_ids[0].replace(/^sku_/, "").replace(/-/g, " "), 3);
   }
-  const anchor = hits[0]?.sku;
+  const anchor = chooseAnchor(hits, message, mandate);
   if (!anchor) {
     const ctx = { merchant_name: merchantName(), buyer_message: message, hits: [], upsell_already_done: session.upsell_done, turn };
     return finish(fallbackSellerReply(ctx).text);
   }
 
   const qty = parseRequestedQty(message);
+  const budget = buyerBudgetPaise(message, mandate);
   let sku_ids = [anchor.id];
   let is_bundle = false;
   if (qty === 1 && !session.upsell_done && inScope(anchor, mandate)) {
     const addon = pickUpsell(anchor, catalog, message);
-    if (addon) {
+    if (addon && anchor.price_paise + addon.price_paise <= budget) {
       sku_ids = [anchor.id, addon.id];
       is_bundle = true;
       session.upsell_done = true;
@@ -272,6 +273,48 @@ async function deterministicTurn(input: SellerTurnInput): Promise<SellerTurnResu
   offerResult = makeOffer({ mandate, sku_ids, qty, is_bundle, actor: "seller_agent", now: input.now });
   events.push(eventFor(offerResult));
   return finish(presentOffer(offerResult, message, hits, mandate, session.upsell_done, turn, is_bundle));
+}
+
+const GENERIC_NAME_WORDS = new Set(["saree", "sari", "piece", "set", "gift", "gold", "silk", "border", "matching"]);
+
+/** True when the buyer named this product (a distinctive word of its name is in the message). */
+export function mentionsSku(message: string, sku: Sku): boolean {
+  const text = message.toLowerCase();
+  return sku.name
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((w) => w.length >= 4 && !GENERIC_NAME_WORDS.has(w))
+    .some((w) => text.includes(w));
+}
+
+const BUDGET_RE = /(?:budget|under|within|up\s*to|upto|max|below|around)\s*(?:of\s*)?(?:₹|rs\.?|inr)?\s*(\d[\d,]*)|(?:₹|rs\.?)\s*(\d[\d,]*)\s*(?:tak|budget|max)/i;
+
+/** A budget the buyer stated in the message, in paise, or null. */
+export function parseBudgetPaise(message: string): number | null {
+  const m = message.match(BUDGET_RE);
+  const raw = m?.[1] ?? m?.[2];
+  if (!raw) return null;
+  const rupees = Number(raw.replace(/,/g, ""));
+  return Number.isFinite(rupees) && rupees > 0 ? rupees * 100 : null;
+}
+
+function buyerBudgetPaise(message: string, mandate: MandateClaims): number {
+  const stated = parseBudgetPaise(message);
+  return stated === null ? mandate.spend_cap_paise : Math.min(stated, mandate.spend_cap_paise);
+}
+
+/**
+ * Which product to offer first. An explicit ask is honoured even when it will
+ * be countered — the buyer should hear the verdict. A generic request takes the
+ * best-ranked in-scope item that fits the buyer's budget.
+ */
+export function chooseAnchor(hits: Array<{ sku: Sku }>, message: string, mandate: MandateClaims): Sku | undefined {
+  const top = hits[0]?.sku;
+  if (!top) return undefined;
+  if (mentionsSku(message, top)) return top;
+  const budget = buyerBudgetPaise(message, mandate);
+  const fits = hits.find((h) => h.sku.stock > 0 && inScope(h.sku, mandate) && h.sku.price_paise <= budget);
+  return fits?.sku ?? top;
 }
 
 function presentOffer(
