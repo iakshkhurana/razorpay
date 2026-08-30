@@ -1,13 +1,14 @@
 "use client";
 
 import confetti from "canvas-confetti";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { AgentVoiceToggle } from "@/components/AgentVoiceToggle";
 import { AppShell } from "@/components/AppShell";
 import { ApprovalQueue } from "@/components/ApprovalQueue";
-import { LedgerStamp } from "@/components/illustrations";
+import { FloatingCard, LedgerStamp } from "@/components/illustrations";
 import { LedgerBook, type LedgerView } from "@/components/LedgerBook";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -25,15 +26,22 @@ import {
   type OrderView,
   type StatsResponse,
 } from "@/lib/demo/client";
+import { localeOfText, useLocale, useT, voiceLangFor, type Locale, type Translator } from "@/lib/i18n/core";
+import { common } from "@/lib/i18n/strings/common";
+import { dashboard, type DashboardKey } from "@/lib/i18n/strings/dashboard";
 import { formatINR } from "@/lib/money";
 import { isTourActive, useTourAction, type TourEventDetail } from "@/lib/tour/client";
 import { cn } from "@/lib/utils";
 import { useAgentVoice } from "@/lib/voice/useAgentVoice";
 
 const POLL_MS = 2000;
-const CONFETTI_COLORS = ["#3395FF", "#12B76A", "#7C5CFF", "#0B1D3A"];
-const REACH_ERROR = "Could not reach the shop. Retrying every 2 seconds — check that the app is running.";
 const RECENT_LIMIT = 6;
+/** how long the summary card stays after the voice finishes */
+const SUMMARY_LINGER_MS = 7000;
+/* brand blue, money green, owner's-call violet, teal and one saffron spark */
+const CONFETTI_COLORS = ["#2F6BFF", "#12B76A", "#7C5CFF", "#17A9CC", "#FF7A1A"];
+
+type T = Translator<DashboardKey>;
 
 /* ------------------------------------------------------------------ */
 /*  Small helpers                                                      */
@@ -65,19 +73,6 @@ function burstConfetti(): void {
   }
 }
 
-function describeError(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) return err.message;
-  return fallback;
-}
-
-/** Two Hinglish lines for the voice; hi-IN voices read "1,849 rupaye" more reliably than the ₹ glyph. */
-function spokenSummary(s: StatsResponse["stats"]): string {
-  const rupaye = (paise: number) => `${formatINR(paise).replace("₹", "")} rupaye`;
-  const guarded = s.actions_guarded === 1 ? "1 action roka gaya" : `${s.actions_guarded} actions rok liye gaye`;
-  const ledger = s.ledger_intact ? "ledger bilkul sahi hai" : `ledger mein entry number ${s.ledger_broken_at ?? 0} par gadbad hai`;
-  return `Aaj AI ne ${rupaye(s.revenue_paise)} ki bikri ki, ${rupaye(s.upsell_paise)} ka upsell. ${guarded}, ${ledger}.`;
-}
-
 function shortHash(h: string): string {
   if (!h || h.length < 12) return "—";
   return `${h.slice(0, 6)}…${h.slice(-4)}`;
@@ -93,23 +88,28 @@ function fadeUp(delayMs: number): CSSProperties {
   return { "--delay": `${delayMs}ms` } as CSSProperties;
 }
 
-const STATUS_TONE: Record<string, { tone: BadgeTone; label: string }> = {
-  PAID: { tone: "green", label: "Paid" },
-  AWAITING_PAYMENT: { tone: "blue", label: "Awaiting payment" },
-  PENDING_APPROVAL: { tone: "violet", label: "Owner's call" },
-  HELD: { tone: "amber", label: "Held" },
-  FAILED: { tone: "red", label: "Failed" },
-  REJECTED: { tone: "red", label: "Rejected" },
-  DRAFT: { tone: "gray", label: "Draft" },
+const STATUS_TONE: Record<string, BadgeTone> = {
+  PAID: "green",
+  AWAITING_PAYMENT: "blue",
+  PENDING_APPROVAL: "violet",
+  HELD: "amber",
+  FAILED: "red",
+  REJECTED: "red",
+  DRAFT: "gray",
 };
 
-function statusPill(order: OrderView): { tone: BadgeTone; label: string } {
-  if (order.held_recovering) return { tone: "amber", label: "Recovering" };
-  return STATUS_TONE[order.status] ?? { tone: "gray", label: order.status };
+type CommonT = Translator<keyof typeof common.en>;
+
+function statusPill(order: OrderView, t: T, tc: CommonT): { tone: BadgeTone; label: string } {
+  if (order.held_recovering) return { tone: "amber", label: t("orders.status.recovering") };
+  if (order.status === "PENDING_APPROVAL") return { tone: "violet", label: t("orders.status.ownersCall") };
+  const key = `status.order.${order.status}` as keyof typeof common.en;
+  const known = key in common.en;
+  return { tone: STATUS_TONE[order.status] ?? "gray", label: known ? tc(key) : order.status };
 }
 
 /* ------------------------------------------------------------------ */
-/*  Icons for the KPI tiles                                            */
+/*  Icons                                                              */
 /* ------------------------------------------------------------------ */
 
 function RupeeIcon() {
@@ -157,6 +157,14 @@ function SpeakerIcon() {
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  ?paid=<order_id> — the payment page sends the buyer back here      */
 /* ------------------------------------------------------------------ */
@@ -165,40 +173,172 @@ function PaidNotice() {
   const params = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
+  const t = useT(dashboard);
   const announced = useRef(false);
   const paid = params.get("paid");
 
   useEffect(() => {
     if (!paid || announced.current) return;
     announced.current = true;
-    toast(`Payment received for order ${paid}`, "money");
+    toast(t("paid.toast", { id: paid }), "money");
     burstConfetti();
     const next = new URLSearchParams(params.toString());
     next.delete("paid");
     const qs = next.toString();
     router.replace(qs ? `/dashboard?${qs}` : "/dashboard", { scroll: false });
-  }, [paid, params, router, toast]);
+  }, [paid, params, router, toast, t]);
 
   return null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Spoken day summary                                                 */
+/* ------------------------------------------------------------------ */
+
+type SummaryState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "speaking" | "done" | "muted"; text: string; lang: Locale };
+
+/** Five bars that dance while the voice speaks; a quiet row otherwise. */
+function Equalizer({ active }: { active: boolean }) {
+  const reduce = useReducedMotion();
+  const peaks = [0.55, 0.95, 0.7, 1, 0.6];
+  const animated = active && !reduce;
+  return (
+    <span className="flex h-7 items-end gap-[3px]" aria-hidden="true">
+      {peaks.map((peak, i) => (
+        <motion.span
+          key={i}
+          className="block h-7 w-[4px] rounded-full bg-gradient-to-t from-rzp-blue to-rzp-cyan"
+          style={{ originY: 1 }}
+          animate={animated ? { scaleY: [0.22, peak, 0.38, peak * 0.82, 0.22] } : { scaleY: active ? 0.55 : 0.22 }}
+          transition={animated ? { duration: 0.95 + i * 0.09, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+        />
+      ))}
+    </span>
+  );
+}
+
+interface SummaryCardProps {
+  state: SummaryState;
+  provider: "sarvam" | "browser" | "none";
+  onStop: () => void;
+  onReplay: () => void;
+  onClose: () => void;
+}
+
+function SummaryCard({ state, provider, onStop, onReplay, onClose }: SummaryCardProps) {
+  const t = useT(dashboard);
+  const reduce = useReducedMotion();
+  if (state.status === "idle") return null;
+
+  const speaking = state.status === "speaking";
+  const hasText = state.status === "speaking" || state.status === "done" || state.status === "muted";
+  const statusLine =
+    state.status === "loading"
+      ? t("summary.loading")
+      : state.status === "error"
+        ? t("summary.error")
+        : state.status === "speaking"
+          ? t("summary.speaking")
+          : state.status === "done"
+            ? t("summary.done")
+            : provider === "none"
+              ? t("summary.noVoice")
+              : t("summary.voiceOff");
+
+  return (
+    <motion.section
+      key="summary"
+      aria-label={t("summary.title")}
+      aria-live="polite"
+      initial={{ opacity: 0, y: reduce ? 0 : -8, scale: reduce ? 1 : 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: reduce ? 0 : -6, scale: reduce ? 1 : 0.985 }}
+      transition={{ duration: reduce ? 0 : 0.22, ease: "easeOut" }}
+      className="mb-6 overflow-hidden rounded-2xl border border-rzp-blue/20 bg-white shadow-card"
+    >
+      <div className="h-1 w-full bg-gradient-to-r from-rzp-saffron via-rzp-blue to-rzp-cyan" aria-hidden="true" />
+      <div className="flex items-start gap-4 px-5 py-4">
+        <div className="mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rzp-ice ring-1 ring-rzp-border">
+          <Equalizer active={speaking} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rzp-blueDeep">{t("summary.title")}</p>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                state.status === "error"
+                  ? "border-rzp-red/30 bg-rzp-red/10 text-[#B3262C]"
+                  : speaking
+                    ? "border-rzp-teal/35 bg-rzp-teal/10 text-[#0B6B84]"
+                    : "border-rzp-border bg-rzp-mist2 text-rzp-muted",
+              )}
+              role="status"
+            >
+              {speaking ? <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-rzp-teal animate-dot-pulse" /> : null}
+              {statusLine}
+            </span>
+          </div>
+          {hasText ? (
+            <p lang={state.lang} className="mt-2 font-display text-lg font-semibold leading-snug tracking-tight text-rzp-text sm:text-xl">
+              {state.text}
+            </p>
+          ) : state.status === "loading" ? (
+            <SkeletonLines lines={2} className="mt-3 max-w-xl" />
+          ) : null}
+          {hasText ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {speaking ? (
+                <Button size="sm" variant="secondary" onClick={onStop}>
+                  {t("summary.stop")}
+                </Button>
+              ) : (
+                <Button size="sm" variant="secondary" onClick={onReplay}>
+                  <SpeakerIcon />
+                  {t("summary.replay")}
+                </Button>
+              )}
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("summary.close")}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-rzp-muted transition-colors hover:bg-rzp-mist hover:text-rzp-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2"
+        >
+          <CloseIcon />
+        </button>
+      </div>
+    </motion.section>
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /*  KPI row                                                            */
 /* ------------------------------------------------------------------ */
 
-function KpiRow({ stats }: { stats: StatsResponse["stats"] | null }) {
+function KpiRow({ stats, evalRun }: { stats: StatsResponse["stats"] | null; evalRun: StatsResponse["eval"] }) {
+  const t = useT(dashboard);
   const loading = stats === null;
   const intact = stats?.ledger_intact ?? true;
   const upsellPct = stats?.upsell_pct ?? 0;
+  const pending = stats?.pending_approvals ?? 0;
+  const uplift = evalRun?.revenue_uplift_pct ?? null;
 
   return (
-    <section aria-label="Today's numbers" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label={t("kpi.section")} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Stat
         className="fade-up"
         style={fadeUp(0)}
-        label="Revenue via AI"
+        label={t("kpi.revenue")}
         value={formatINR(stats?.revenue_paise ?? 0)}
-        hint={stats ? (stats.orders_paid === 1 ? "1 order paid" : `${stats.orders_paid} orders paid`) : " "}
+        delta={uplift !== null ? { label: t("kpi.revenue.delta", { pct: `${uplift > 0 ? "+" : ""}${uplift}` }), direction: uplift > 0 ? "up" : uplift < 0 ? "down" : "flat" } : undefined}
+        hint={stats ? (stats.orders_paid === 1 ? t("kpi.revenue.hint.one") : t("kpi.revenue.hint.many", { n: stats.orders_paid })) : " "}
         tone="green"
         icon={<RupeeIcon />}
         loading={loading}
@@ -206,10 +346,10 @@ function KpiRow({ stats }: { stats: StatsResponse["stats"] | null }) {
       <Stat
         className="fade-up"
         style={fadeUp(80)}
-        label="Upsell uplift"
+        label={t("kpi.upsell")}
         value={formatINR(stats?.upsell_paise ?? 0)}
         delta={{ label: `${upsellPct > 0 ? "+" : ""}${upsellPct}%`, direction: upsellPct > 0 ? "up" : "flat" }}
-        hint="of revenue from bundles"
+        hint={t("kpi.upsell.hint")}
         tone="blue"
         icon={<TrendIcon />}
         loading={loading}
@@ -217,8 +357,12 @@ function KpiRow({ stats }: { stats: StatsResponse["stats"] | null }) {
       <Stat
         className="fade-up"
         style={fadeUp(160)}
-        label="Actions guarded"
+        label={t("kpi.guarded")}
         value={String(stats?.actions_guarded ?? 0)}
+        delta={{
+          label: pending === 0 ? t("kpi.guarded.delta.none") : pending === 1 ? t("kpi.guarded.delta.one") : t("kpi.guarded.delta.many", { n: pending }),
+          direction: "flat",
+        }}
         hint={<span className="font-mono tracking-wide">COUNTER + GATE + DENY</span>}
         tone="amber"
         icon={<ShieldIcon />}
@@ -227,13 +371,10 @@ function KpiRow({ stats }: { stats: StatsResponse["stats"] | null }) {
       <Stat
         className="fade-up"
         style={fadeUp(240)}
-        label="Ledger integrity"
-        value={intact ? "✓ Intact" : `✗ Tampered at #${stats?.ledger_broken_at ?? "?"}`}
-        hint={
-          <span className="font-mono tnum">
-            head {shortHash(stats?.head_hash ?? "")} · {stats?.ledger_count ?? 0} entries
-          </span>
-        }
+        label={t("kpi.integrity")}
+        value={<span className="font-display text-2xl">{intact ? t("kpi.intact") : t("kpi.tampered", { n: stats?.ledger_broken_at ?? "?" })}</span>}
+        delta={{ label: intact ? t("kpi.integrity.delta") : t("kpi.integrity.deltaBroken"), direction: intact ? "up" : "down" }}
+        hint={<span className="font-mono tnum">{t("kpi.integrity.hint", { hash: shortHash(stats?.head_hash ?? ""), n: stats?.ledger_count ?? 0 })}</span>}
         tone={intact ? "green" : "red"}
         icon={<ChainIcon />}
         loading={loading}
@@ -243,10 +384,125 @@ function KpiRow({ stats }: { stats: StatsResponse["stats"] | null }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  The book                                                           */
+/* ------------------------------------------------------------------ */
+
+const VIEWS: readonly LedgerView[] = ["shopkeeper", "tech"];
+
+function ViewSwitch({ view, onChange }: { view: LedgerView; onChange: (next: LedgerView) => void }) {
+  const t = useT(dashboard);
+  const groupRef = useRef<HTMLDivElement>(null);
+
+  function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, current: number) {
+    let next: number | null = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (current + 1) % VIEWS.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (current - 1 + VIEWS.length) % VIEWS.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = VIEWS.length - 1;
+    if (next === null) return;
+    e.preventDefault();
+    onChange(VIEWS[next]);
+    groupRef.current?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+  }
+
+  return (
+    <div ref={groupRef} role="group" aria-label={t("book.view")} className="inline-flex rounded-lg bg-rzp-mist2 p-0.5">
+      {VIEWS.map((key, i) => {
+        const active = view === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(key)}
+            onKeyDown={(e) => onKeyDown(e, i)}
+            className={cn(
+              "h-7 rounded-md px-3 text-sm font-medium transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
+              active ? "bg-white text-rzp-blueDeep shadow-sm" : "text-rzp-muted hover:text-rzp-text",
+            )}
+          >
+            {key === "shopkeeper" ? t("book.shopkeeper") : t("book.tech")}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+interface LedgerState {
+  entries: LedgerEntryView[];
+  chain: LedgerResponse["chain"];
+}
+
+function TheBook({ ledger, view, onView }: { ledger: LedgerState | null; view: LedgerView; onView: (next: LedgerView) => void }) {
+  const t = useT(dashboard);
+  const chain = ledger?.chain ?? null;
+  const entries = ledger?.entries ?? [];
+  const empty = ledger !== null && entries.length === 0;
+
+  return (
+    <section className="min-w-0 lg:col-span-2" aria-labelledby="ledger-heading">
+      <Card className="fade-up overflow-hidden" style={fadeUp(320)} aria-busy={ledger === null || undefined}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rzp-border px-5 py-4">
+          <div className="min-w-0">
+            <h2 id="ledger-heading" className="font-display text-lg font-semibold tracking-tight text-rzp-text">
+              {t("book.title")}
+            </h2>
+            <p className="text-xs text-rzp-muted">{t("book.desc")}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {chain ? (
+              <>
+                <Badge tone="gray" className="font-mono tnum">
+                  {chain.count === 1 ? t("book.entries.one") : t("book.entries.many", { n: chain.count })}
+                </Badge>
+                <Badge tone={chain.intact ? "green" : "red"} dot aria-live="polite">
+                  {chain.intact ? t("book.chainOk") : t("book.chainBroken", { n: chain.broken_at ?? "?" })}
+                </Badge>
+              </>
+            ) : (
+              <Skeleton className="h-6 w-36 rounded-full" />
+            )}
+            <ViewSwitch view={view} onChange={onView} />
+          </div>
+        </div>
+
+        <div aria-live="polite" aria-label={t("book.feed")}>
+          {ledger === null ? (
+            <div className="ledger-spine ruled-paper pl-[6px]">
+              <div className="px-5 py-6">
+                <p className="text-sm text-rzp-muted">{t("book.opening")}</p>
+                <SkeletonLines lines={4} className="mt-4" />
+              </div>
+            </div>
+          ) : empty ? (
+            <div className="ledger-spine ruled-paper pl-[6px]">
+              <div className="flex flex-col items-center px-6 py-10 text-center">
+                <LedgerStamp className="w-56" title={t("book.empty.art")} />
+                <p className="mt-4 text-base font-medium text-rzp-text">{t("book.empty.title")}</p>
+                <p className="mt-1 max-w-md text-sm text-rzp-muted">{t("book.empty.desc")}</p>
+                <Link href="/simulator" className={buttonClasses({ variant: "primary", size: "sm", className: "mt-4" })}>
+                  {t("book.empty.cta")}
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <LedgerBook entries={entries} view={view} maxHeight="62vh" className="rounded-none border-0 bg-transparent" />
+          )}
+        </div>
+      </Card>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Recent orders                                                      */
 /* ------------------------------------------------------------------ */
 
 function RecentOrders({ orders, loaded }: { orders: OrderView[]; loaded: boolean }) {
+  const t = useT(dashboard);
+  const tc = useT(common);
   const rows = useMemo(
     () =>
       [...orders]
@@ -260,12 +516,12 @@ function RecentOrders({ orders, loaded }: { orders: OrderView[]; loaded: boolean
       <Card aria-busy={!loaded || undefined}>
         <CardHeader>
           <div className="min-w-0">
-            <CardTitle id="recent-orders-heading">Recent orders</CardTitle>
-            <CardDescription className="mt-0.5">Every order the agents placed, latest first.</CardDescription>
+            <CardTitle id="recent-orders-heading">{t("orders.title")}</CardTitle>
+            <CardDescription className="mt-0.5">{t("orders.desc")}</CardDescription>
           </div>
           {loaded && orders.length > RECENT_LIMIT ? (
             <Badge tone="gray" className="shrink-0">
-              {orders.length} total
+              {t("orders.total", { n: orders.length })}
             </Badge>
           ) : null}
         </CardHeader>
@@ -273,38 +529,41 @@ function RecentOrders({ orders, loaded }: { orders: OrderView[]; loaded: boolean
           {!loaded ? (
             <SkeletonLines lines={4} />
           ) : rows.length === 0 ? (
-            <p className="text-sm text-rzp-muted">
-              No orders yet.{" "}
-              <Link href="/simulator" className="font-medium text-rzp-blueDeep underline-offset-4 hover:underline">
-                Run the demo buyer
-              </Link>{" "}
-              and the first one lands here.
-            </p>
+            <div className="flex items-center gap-4">
+              <FloatingCard className="w-24 shrink-0" title={t("orders.empty.art")} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-rzp-text">{t("orders.empty.title")}</p>
+                <p className="mt-1 text-sm text-rzp-muted">{t("orders.empty.desc")}</p>
+                <Link href="/simulator" className="mt-1 inline-block text-sm font-medium text-rzp-blueDeep underline-offset-4 hover:underline">
+                  {t("orders.empty.cta")} →
+                </Link>
+              </div>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[22rem] text-sm">
                 <thead>
                   <tr className="text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-rzp-muted">
                     <th scope="col" className="px-5 pb-2 font-semibold">
-                      Order
+                      {t("orders.col.order")}
                     </th>
                     <th scope="col" className="pb-2 pr-3 font-semibold">
-                      Items
+                      {t("orders.col.items")}
                     </th>
                     <th scope="col" className="pb-2 pr-3 text-right font-semibold">
-                      Amount
+                      {t("orders.col.amount")}
                     </th>
                     <th scope="col" className="pb-2 pr-5 text-right font-semibold">
-                      Status
+                      {t("orders.col.status")}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-rzp-border">
                   {rows.map((order) => {
-                    const pill = statusPill(order);
+                    const pill = statusPill(order, t, tc);
                     const items = order.sku_names.length > 0 ? order.sku_names.join(" + ") : order.sku_ids.join(", ");
                     return (
-                      <tr key={order.id} className="align-middle">
+                      <tr key={order.id} className="align-middle transition-colors hover:bg-rzp-mist">
                         <td className="px-5 py-2.5 font-mono text-xs text-rzp-text" title={order.id}>
                           {shortId(order.id)}
                         </td>
@@ -335,12 +594,9 @@ function RecentOrders({ orders, loaded }: { orders: OrderView[]; loaded: boolean
 /*  The Control Tower                                                  */
 /* ------------------------------------------------------------------ */
 
-interface LedgerState {
-  entries: LedgerEntryView[];
-  chain: LedgerResponse["chain"];
-}
-
 function Dashboard() {
+  const t = useT(dashboard);
+  const { locale } = useLocale();
   const { toast } = useToast();
   const voice = useAgentVoice();
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -351,6 +607,7 @@ function Dashboard() {
   const [view, setView] = useState<LedgerView>("shopkeeper");
   const [error, setError] = useState<string | null>(null);
   const [tourNote, setTourNote] = useState<string | null>(null);
+  const [summary, setSummary] = useState<SummaryState>({ status: "idle" });
 
   const viewRef = useRef<LedgerView>("shopkeeper");
   const inFlight = useRef(false);
@@ -360,9 +617,18 @@ function Dashboard() {
   const seenLedger = useRef<Set<string> | null>(null);
   /** tour steps run one after another, never dropped, never overlapping */
   const tourQueue = useRef<Promise<void>>(Promise.resolve());
+  /** bumps when a newer summary request or a close supersedes the running one */
+  const summarySeq = useRef(0);
+  /** the translator the async tour handlers read, so they follow a language switch without resubscribing */
+  const tRef = useRef<T>(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   const held = useMemo(() => orders.filter((x) => x.held_recovering || x.status === "HELD"), [orders]);
   const voiceAvailable = voice.supported || voice.provider === "sarvam";
+
+  /* ---------------- Polling ---------------- */
 
   const applyLedger = useCallback((res: LedgerResponse) => {
     if (res.view !== viewRef.current) return;
@@ -395,7 +661,7 @@ function Dashboard() {
         if (p.status === "fulfilled") setPending(p.value.orders);
         if (o.status === "fulfilled") setOrders(o.value.orders);
         if (p.status === "fulfilled" && o.status === "fulfilled") setOrdersLoaded(true);
-        setError(results.some((r) => r.status === "rejected") ? REACH_ERROR : null);
+        setError(results.some((r) => r.status === "rejected") ? tRef.current("error.reach") : null);
       } finally {
         if (seq === refreshSeq.current) inFlight.current = false;
       }
@@ -409,25 +675,79 @@ function Dashboard() {
     return () => window.clearInterval(timer);
   }, [refresh]);
 
-  function changeView(next: LedgerView) {
-    if (next === viewRef.current) return;
-    viewRef.current = next;
-    setView(next);
-    void refresh(true);
+  const changeView = useCallback(
+    (next: LedgerView) => {
+      if (next === viewRef.current) return;
+      viewRef.current = next;
+      setView(next);
+      void refresh(true);
+    },
+    [refresh],
+  );
+
+  /* ---------------- Day summary ---------------- */
+
+  /** Hindi text goes to the hi-IN voice, English to en-IN; the card shows the line while it plays. */
+  async function speakText(text: string, lang: Locale, seq: number) {
+    voice.stop();
+    setSummary({ status: "speaking", text, lang });
+    await voice.speak(text, voiceLangFor(lang));
+    if (seq !== summarySeq.current) return;
+    setSummary({ status: "done", text, lang });
   }
 
-  function speakSummary() {
+  async function playSummary() {
     if (!stats) {
-      toast("Stats abhi aa rahe hain — ek second.");
+      toast(t("toast.statsPending"));
       return;
     }
-    if (!voice.enabled) {
-      toast("Voice is off — switch it on, then play the summary.");
+    summarySeq.current += 1;
+    const seq = summarySeq.current;
+    setSummary({ status: "loading" });
+    let text: string;
+    try {
+      const res = await api.summary(locale);
+      text = res.text;
+    } catch {
+      if (seq === summarySeq.current) setSummary({ status: "error" });
       return;
     }
-    voice.stop();
-    void voice.speak(spokenSummary(stats.stats), "hi-IN");
+    if (seq !== summarySeq.current) return;
+    const lang = localeOfText(text);
+    if (!voiceAvailable || !voice.enabled) {
+      setSummary({ status: "muted", text, lang });
+      return;
+    }
+    await speakText(text, lang, seq);
   }
+
+  function replaySummary() {
+    if (summary.status !== "done" && summary.status !== "muted") return;
+    if (!voiceAvailable || !voice.enabled) {
+      setSummary({ status: "muted", text: summary.text, lang: summary.lang });
+      return;
+    }
+    summarySeq.current += 1;
+    void speakText(summary.text, summary.lang, summarySeq.current);
+  }
+
+  function stopSummary() {
+    summarySeq.current += 1;
+    voice.stop();
+    if (summary.status === "speaking") setSummary({ status: "done", text: summary.text, lang: summary.lang });
+  }
+
+  function closeSummary() {
+    summarySeq.current += 1;
+    voice.stop();
+    setSummary({ status: "idle" });
+  }
+
+  useEffect(() => {
+    if (summary.status !== "done") return;
+    const timer = window.setTimeout(() => setSummary({ status: "idle" }), SUMMARY_LINGER_MS);
+    return () => window.clearTimeout(timer);
+  }, [summary]);
 
   /* ---------------- Grand Tour steps 8 and 9 ---------------- */
 
@@ -438,7 +758,7 @@ function Dashboard() {
     });
     const order = res.order;
     if (!order) {
-      setTourNote("The seller did not reach checkout for the gated order. Open the simulator and run the wedding goal by hand.");
+      setTourNote(tRef.current("tour.noGate"));
       return;
     }
     await refresh(true);
@@ -461,11 +781,11 @@ function Dashboard() {
     });
     const order = res.order;
     if (!order) {
-      setTourNote("The seller did not reach checkout for the gift order. Open the simulator and run the demo buyer by hand.");
+      setTourNote(tRef.current("tour.noGift"));
       return;
     }
     if (order.status !== "AWAITING_PAYMENT") {
-      setTourNote(`The gift order landed in ${order.status} instead of awaiting payment, so there is no bank to fail. Approve it from the queue to continue.`);
+      setTourNote(tRef.current("tour.giftStatus", { status: order.status }));
       return;
     }
     await refresh(true);
@@ -487,7 +807,7 @@ function Dashboard() {
         try {
           await play();
         } catch (err) {
-          setTourNote(describeError(err, "The tour could not stage this step — the shop did not answer. Check that the app is running."));
+          setTourNote(err instanceof ApiError ? err.message : tRef.current("tour.error"));
         }
       });
     },
@@ -497,22 +817,18 @@ function Dashboard() {
 
   /* ---------------- Render ---------------- */
 
-  const merchantName = stats?.merchant?.name ?? "Aapki dukaan";
-  const chain = ledger?.chain ?? null;
-  const entries = ledger?.entries ?? [];
-  const ledgerEmpty = ledger !== null && entries.length === 0;
+  const merchantName = stats?.merchant?.name ?? t("badge.shop");
+  const summaryBusy = summary.status === "loading";
 
   const actions = (
     <>
       <AgentVoiceToggle />
-      {voiceAvailable ? (
-        <Button variant="secondary" size="sm" onClick={speakSummary}>
-          <SpeakerIcon />
-          Aaj ka summary
-        </Button>
-      ) : null}
+      <Button variant="secondary" size="sm" onClick={() => void playSummary()} loading={summaryBusy} aria-pressed={summary.status === "speaking"}>
+        {summaryBusy ? null : <SpeakerIcon />}
+        {summaryBusy ? t("action.summaryBusy") : t("action.summary")}
+      </Button>
       <Link href="/dashboard?tour=1" className={buttonClasses({ variant: "primary", size: "sm" })}>
-        Grand Tour
+        {t("action.tour")}
       </Link>
     </>
   );
@@ -523,16 +839,16 @@ function Dashboard() {
         {stats ? (
           <>
             <Badge tone={stats.merchant?.live ? "green" : "gray"} dot>
-              {stats.merchant?.live ? `${merchantName} · live` : `${merchantName} · offline`}
+              {stats.merchant?.live ? t("badge.live", { name: merchantName }) : t("badge.offline", { name: merchantName })}
             </Badge>
             {stats.stats.pending_approvals > 0 ? (
               <Badge tone="violet" dot>
-                {stats.stats.pending_approvals} awaiting your call
+                {stats.stats.pending_approvals === 1 ? t("badge.pending.one") : t("badge.pending.many", { n: stats.stats.pending_approvals })}
               </Badge>
             ) : null}
             {stats.stats.held_orders > 0 ? (
               <Badge tone="amber" dot>
-                {stats.stats.held_orders} held
+                {stats.stats.held_orders === 1 ? t("badge.held.one") : t("badge.held.many", { n: stats.stats.held_orders })}
               </Badge>
             ) : null}
           </>
@@ -551,81 +867,22 @@ function Dashboard() {
   return (
     <AppShell
       section="tower"
-      title="Control Tower"
-      subtitle="Har paisa, likha hua — aaj ki poori kitaab."
+      title={t("page.title")}
+      subtitle={t("page.subtitle")}
       actions={actions}
       headerExtra={headerExtra}
       voice={voiceAvailable ? voice.enabled : undefined}
     >
-      <KpiRow stats={stats?.stats ?? null} />
+      <AnimatePresence initial={false}>
+        {summary.status !== "idle" ? (
+          <SummaryCard key="summary" state={summary} provider={voice.provider} onStop={stopSummary} onReplay={replaySummary} onClose={closeSummary} />
+        ) : null}
+      </AnimatePresence>
+
+      <KpiRow stats={stats?.stats ?? null} evalRun={stats?.eval ?? null} />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <section className="min-w-0 lg:col-span-2" aria-labelledby="ledger-heading">
-          <Card className="fade-up overflow-hidden" style={fadeUp(320)} aria-busy={ledger === null || undefined}>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rzp-border px-5 py-4">
-              <div className="min-w-0">
-                <h2 id="ledger-heading" className="font-display text-lg font-semibold tracking-tight text-rzp-text">
-                  The book
-                </h2>
-                <p className="text-xs text-rzp-muted">Bahi-khata, live — newest entry on top.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                {chain ? (
-                  <span className={cn("font-mono text-xs tnum", chain.intact ? "text-rzp-muted" : "text-[#B3262C]")} aria-live="polite">
-                    {chain.count} {chain.count === 1 ? "entry" : "entries"} · chain{" "}
-                    <span className={chain.intact ? "font-semibold text-[#087443]" : "font-semibold"}>{chain.intact ? "✓" : `✗ at #${chain.broken_at ?? "?"}`}</span>
-                  </span>
-                ) : (
-                  <Skeleton className="h-4 w-28" />
-                )}
-                <div role="group" aria-label="Ledger view" className="inline-flex rounded-lg bg-rzp-mist2 p-0.5">
-                  {(["shopkeeper", "tech"] as const).map((key) => {
-                    const active = view === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => changeView(key)}
-                        className={cn(
-                          "h-7 rounded-md px-3 text-sm font-medium transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
-                          active ? "bg-white text-rzp-blueDeep shadow-sm" : "text-rzp-muted hover:text-rzp-text",
-                        )}
-                      >
-                        {key === "shopkeeper" ? "Shopkeeper" : "Technical"}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div aria-live="polite" aria-label="Ledger feed, newest first">
-              {ledger === null ? (
-                <div className="ledger-spine ruled-paper pl-[6px]">
-                  <div className="px-5 py-6">
-                    <p className="text-sm text-rzp-muted">Opening the book…</p>
-                    <SkeletonLines lines={4} className="mt-4" />
-                  </div>
-                </div>
-              ) : ledgerEmpty ? (
-                <div className="ledger-spine ruled-paper pl-[6px]">
-                  <div className="flex flex-col items-center px-6 py-10 text-center">
-                    <LedgerStamp className="w-56" title="An open ledger, waiting for its first entry" />
-                    <p className="mt-4 text-base font-medium text-rzp-text">Ledger abhi khaali hai — run the demo buyer to write the first entry.</p>
-                    <p className="mt-1 max-w-md text-sm text-rzp-muted">Every offer, verdict and payment lands here the moment it happens, stamped and hash-chained.</p>
-                    <Link href="/simulator" className={buttonClasses({ variant: "primary", size: "sm", className: "mt-4" })}>
-                      Run the demo buyer
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <LedgerBook entries={entries} view={view} maxHeight="62vh" className="rounded-none border-0 bg-transparent" />
-              )}
-            </div>
-          </Card>
-        </section>
+        <TheBook ledger={ledger} view={view} onView={changeView} />
 
         <aside className="min-w-0 space-y-6 fade-up" style={fadeUp(400)}>
           <ApprovalQueue pending={pending} held={held} loaded={ordersLoaded} onChanged={() => refresh(true)} />

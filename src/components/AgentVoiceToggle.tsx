@@ -1,11 +1,14 @@
 "use client";
 
+import { useT } from "@/lib/i18n/core";
+import { common } from "@/lib/i18n/strings/common";
 import { useAgentVoice } from "@/lib/voice/useAgentVoice";
 import { cn } from "@/lib/utils";
 
 /**
  * Pill that mutes or unmutes the agents' voice. Renders nothing when the
  * browser cannot speak and the server has no voice provider either.
+ * Labels follow the site language through the common dictionary.
  */
 
 export interface AgentVoiceToggleProps {
@@ -16,16 +19,17 @@ export interface AgentVoiceToggleProps {
 
 export function AgentVoiceToggle({ className, tone = "light" }: AgentVoiceToggleProps) {
   const { enabled, toggle, supported, provider } = useAgentVoice();
+  const t = useT(common);
   if (!supported && provider !== "sarvam") return null;
 
-  const label = !enabled ? "Voice off" : provider === "sarvam" ? "Voice on · Sarvam" : "Voice on";
+  const label = !enabled ? t("voice.off") : provider === "sarvam" ? t("voice.onSarvam") : t("voice.on");
 
   return (
     <button
       type="button"
       onClick={toggle}
       aria-pressed={enabled}
-      title={enabled ? "Mute the agents" : "Let the agents speak"}
+      title={enabled ? t("voice.mute") : t("voice.unmute")}
       className={cn(
         "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3395FF] focus-visible:ring-offset-2",

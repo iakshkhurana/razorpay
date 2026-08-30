@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { VerdictStamp } from "@/components/VerdictStamp";
 import { ApiError, api, type OrderView } from "@/lib/demo/client";
+import { useT } from "@/lib/i18n/core";
+import { dashboard } from "@/lib/i18n/strings/dashboard";
 import { formatINR } from "@/lib/money";
 
 export interface ApprovalQueueProps {
@@ -25,22 +27,14 @@ export interface ApprovalQueueProps {
 
 type Decision = "approve" | "reject";
 
-/** "₹5,648 Banarasi order": the first word of the first SKU names the card; a nameless order is just "₹5,648 order". */
-function cardTitle(order: OrderView): string {
-  const lead = order.sku_names[0]?.trim().split(/\s+/)[0];
-  return lead ? `${lead} order` : "order";
-}
-
-function describeError(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  return "Could not reach the shop. Check that the app is running and try again.";
-}
-
 function OrderHeadline({ order }: { order: OrderView }) {
+  const t = useT(dashboard);
+  /* "₹5,648 Banarasi order": the first word of the first SKU names the card. */
+  const lead = order.sku_names[0]?.trim().split(/\s+/)[0];
   return (
     <div className="min-w-0">
       <h3 className="font-display text-lg font-semibold leading-tight tracking-tight text-rzp-text">
-        <span className="font-mono tnum">{formatINR(order.amount_paise)}</span> {cardTitle(order)}
+        <span className="font-mono tnum">{formatINR(order.amount_paise)}</span> {lead ? t("order.title", { lead }) : t("order.title.plain")}
       </h3>
       <p className="mt-1 text-sm text-rzp-muted">
         {order.sku_names.join(" + ")}
@@ -68,6 +62,7 @@ function QueueSkeleton() {
  * failed at the bank sit below with their backup link. The AI never decides either.
  */
 export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueueProps) {
+  const t = useT(dashboard);
   const { toast } = useToast();
   const [busy, setBusy] = useState<Record<string, Decision>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -81,10 +76,10 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
     });
     try {
       await api.decide({ order_id: order.id, decision });
-      toast(decision === "approve" ? "Order approved — payment link bhej diya" : "Order rejected — ledger mein likh diya", decision === "approve" ? "money" : "ink");
+      toast(decision === "approve" ? t("queue.approved") : t("queue.rejected"), decision === "approve" ? "money" : "ink");
       await onChanged();
     } catch (err) {
-      setErrors((e) => ({ ...e, [order.id]: describeError(err) }));
+      setErrors((e) => ({ ...e, [order.id]: err instanceof ApiError ? err.message : t("queue.error") }));
     } finally {
       setBusy((b) => {
         const next = { ...b };
@@ -100,12 +95,12 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
         <Card aria-busy={!loaded || undefined}>
           <CardHeader>
             <div className="min-w-0">
-              <CardTitle id="approval-queue-heading">Owner&apos;s call</CardTitle>
-              <CardDescription className="mt-0.5">Orders above the gate wait for you. The AI never decides these.</CardDescription>
+              <CardTitle id="approval-queue-heading">{t("queue.title")}</CardTitle>
+              <CardDescription className="mt-0.5">{t("queue.desc")}</CardDescription>
             </div>
             {loaded && pending.length > 0 ? (
               <Badge tone="violet" dot className="shrink-0">
-                {pending.length} waiting
+                {pending.length === 1 ? t("queue.waiting.one") : t("queue.waiting.many", { n: pending.length })}
               </Badge>
             ) : null}
           </CardHeader>
@@ -116,13 +111,12 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
               <div className="flex items-center gap-4">
                 <ShieldCheck className="w-20 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-rzp-text">Koi order aapka intezaar nahi kar raha.</p>
+                  <p className="text-sm font-medium text-rzp-text">{t("queue.empty.title")}</p>
                   <p className="mt-1 text-sm text-rzp-muted">
-                    Big orders land here for your call.{" "}
+                    {t("queue.empty.desc")}{" "}
                     <Link href="/simulator" className="font-medium text-rzp-blueDeep underline-offset-4 hover:underline">
-                      Stage one in the simulator
+                      {t("queue.empty.cta")}
                     </Link>
-                    .
                   </p>
                 </div>
               </div>
@@ -136,10 +130,10 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
                         <OrderHeadline order={order} />
                         <VerdictStamp kind="GATE" size="sm" animate={false} className="bg-white/80" />
                       </div>
-                      <p className="mt-2 text-xs text-rzp-muted">Big order — you decide. Either answer is written into the book.</p>
+                      <p className="mt-2 text-xs text-rzp-muted">{t("queue.note")}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Button size="sm" variant="primary" onClick={() => void decide(order, "approve")} loading={working === "approve"} disabled={Boolean(working)}>
-                          Approve order
+                          {t("queue.approve")}
                         </Button>
                         <Button
                           size="sm"
@@ -148,7 +142,7 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
                           loading={working === "reject"}
                           disabled={Boolean(working)}
                         >
-                          Reject order
+                          {t("queue.reject")}
                         </Button>
                       </div>
                       {errors[order.id] ? (
@@ -169,12 +163,12 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
         <Card aria-busy={!loaded || undefined}>
           <CardHeader>
             <div className="min-w-0">
-              <CardTitle id="held-orders-heading">Held &amp; recovering</CardTitle>
-              <CardDescription className="mt-0.5">When the bank fails a payment, the order parks here with a backup link.</CardDescription>
+              <CardTitle id="held-orders-heading">{t("held.title")}</CardTitle>
+              <CardDescription className="mt-0.5">{t("held.desc")}</CardDescription>
             </div>
             {loaded && held.length > 0 ? (
               <Badge tone="amber" dot className="shrink-0">
-                {held.length} held
+                {held.length === 1 ? t("held.count.one") : t("held.count.many", { n: held.length })}
               </Badge>
             ) : null}
           </CardHeader>
@@ -182,7 +176,7 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
             {!loaded ? (
               <Skeleton className="h-4 w-3/4" />
             ) : held.length === 0 ? (
-              <p className="text-sm text-rzp-muted">Koi payment atki nahi hai. Nothing is lost when one fails — it recovers from here.</p>
+              <p className="text-sm text-rzp-muted">{t("held.empty")}</p>
             ) : (
               <ul className="space-y-3" aria-live="polite">
                 {held.map((order) => (
@@ -191,14 +185,11 @@ export function ApprovalQueue({ pending, held, loaded, onChanged }: ApprovalQueu
                       <OrderHeadline order={order} />
                       <VerdictStamp kind="HELD" size="sm" animate={false} className="bg-white/80" />
                     </div>
-                    <p className="mt-2 text-sm text-rzp-text">
-                      {order.payment_url
-                        ? "Payment failed at the bank. A backup payment link is ready below."
-                        : "Payment failed at the bank. A backup payment link is on its way — this card updates on its own."}
-                    </p>
+                    <p className="mt-2 text-sm text-rzp-text">{order.payment_url ? t("held.linkReady") : t("held.linkComing")}</p>
                     {order.payment_url ? (
-                      <a href={order.payment_url} target="_blank" rel="noreferrer" className={buttonClasses({ variant: "outline-blue", size: "sm", className: "mt-3" })}>
-                        Open backup link
+                      <a href={order.payment_url} target="_blank" rel="noreferrer" className={buttonClasses({ variant: "primary", size: "sm", className: "mt-3" })}>
+                        {t("held.open")}
+                        <span aria-hidden="true">↗</span>
                       </a>
                     ) : null}
                   </li>

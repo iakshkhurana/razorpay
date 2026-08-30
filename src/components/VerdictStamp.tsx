@@ -31,13 +31,15 @@ export interface VerdictStampProps {
   size?: keyof typeof SIZE;
   animate?: boolean;
   className?: string;
+  /** replaces the English label (a translated stamp); colours still follow `kind` */
+  label?: string;
 }
 
 /**
  * Rubber-stamp badge: uppercase, letterspaced, 1.5px border, rotated -2°,
  * pressed on with the stamp animation. The label is always text — never colour alone.
  */
-export function VerdictStamp({ kind, size = "md", animate = true, className }: VerdictStampProps) {
+export function VerdictStamp({ kind, size = "md", animate = true, className, label }: VerdictStampProps) {
   const k = stampKindFor(kind);
   const s = STYLE[k];
   return (
@@ -53,7 +55,7 @@ export function VerdictStamp({ kind, size = "md", animate = true, className }: V
       )}
       style={{ borderStyle: "solid" }}
     >
-      {s.label}
+      {label ?? s.label}
     </span>
   );
 }

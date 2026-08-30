@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import * as React from "react";
+import { useT } from "@/lib/i18n/core";
+import { nav } from "@/lib/i18n/strings/nav";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,11 +29,13 @@ export interface BrandLogoProps {
   priority?: boolean;
 }
 
-function MarkTile({ size, label }: { size: number; label: string }) {
+/** The square tile. With a label it is an image; without one it is decorative (the wordmark beside it carries the name). */
+function MarkTile({ size, label }: { size: number; label?: string }) {
   return (
     <span
-      role="img"
-      aria-label={label}
+      role={label ? "img" : undefined}
+      aria-label={label || undefined}
+      aria-hidden={label ? undefined : true}
       className={cn(
         "inline-flex shrink-0 select-none items-center justify-center bg-rzp-navy font-display font-bold tracking-wide text-rzp-cyan ring-1 ring-white/10",
         size >= 36 ? "rounded-xl" : "rounded-lg",
@@ -42,12 +48,13 @@ function MarkTile({ size, label }: { size: number; label: string }) {
 }
 
 export function BrandLogo({ variant = "chip", size = 40, className, href = "/", label = "AgentGate" }: BrandLogoProps) {
+  const tn = useT(nav);
   const figure =
     variant === "mark" ? (
       <MarkTile size={size} label={label} />
     ) : (
       <span className="inline-flex items-center gap-2">
-        <MarkTile size={size} label="" />
+        <MarkTile size={size} />
         <span
           className={cn("font-display font-bold tracking-tight", variant === "onDark" ? "text-white" : "text-rzp-navy")}
           style={{ fontSize: Math.round(size * 0.5) }}
@@ -62,7 +69,7 @@ export function BrandLogo({ variant = "chip", size = 40, className, href = "/", 
   return (
     <Link
       href={href}
-      aria-label={`${label} home`}
+      aria-label={label === "AgentGate" ? tn("brand.home") : label}
       className={cn(
         "inline-flex shrink-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
         className,

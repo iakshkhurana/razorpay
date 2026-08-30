@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useAnimationFrame, useMotionValue, useReducedMotion } from "framer-motion";
-import { useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export interface MarqueeProps {
@@ -28,12 +28,25 @@ export function Marquee({ items, speed = 40, label = "Highlights", tone = "light
   const x = useMotionValue(0);
   const trackRef = useRef<HTMLUListElement>(null);
   const paused = useRef(false);
+  /* width of one run of items — measured once and on resize, never per frame */
+  const loop = useRef(0);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const measure = () => {
+      loop.current = track.scrollWidth / 2;
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, [items.length]);
 
   useAnimationFrame((_, delta) => {
     if (reduce || paused.current) return;
-    const track = trackRef.current;
-    if (!track) return;
-    const half = track.scrollWidth / 2;
+    const half = loop.current;
     if (!half) return;
     let next = x.get() - (speed * delta) / 1000;
     if (next <= -half) next += half;

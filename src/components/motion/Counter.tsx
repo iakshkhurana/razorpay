@@ -66,11 +66,7 @@ export function Counter({ value, prefix = "", suffix = "", duration = 1.6, decim
 
   return (
     <span ref={ref} className={cn("tnum", className)}>
-      <span aria-hidden="true">
-        {prefix}
-        {formatCount(shown, places)}
-        {suffix}
-      </span>
+      <span aria-hidden="true">{`${prefix}${formatCount(shown, places)}${suffix}`}</span>
       <span className="sr-only">{final}</span>
     </span>
   );
