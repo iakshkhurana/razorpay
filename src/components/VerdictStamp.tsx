@@ -34,8 +34,8 @@ export interface VerdictStampProps {
 }
 
 /**
- * Rubber-stamp badge: uppercase, letterspaced, 1.5px border, rotated -2Â°,
- * pressed on with the stamp animation. The label is always text â€” never colour alone.
+ * Rubber-stamp badge: uppercase, letterspaced, 1.5px border, rotated -2°,
+ * pressed on with the stamp animation. The label is always text — never colour alone.
  */
 export function VerdictStamp({ kind, size = "md", animate = true, className }: VerdictStampProps) {
   const k = stampKindFor(kind);

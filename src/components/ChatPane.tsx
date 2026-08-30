@@ -164,7 +164,7 @@ function StampRow({ events }: { events: VerdictEvent[] }) {
           <p className="mt-1 leading-snug">{ev.verdict.human_reason}</p>
           {ev.verdict.counter ? (
             <p className="mt-0.5 leading-snug text-turmeric">
-              Counter: <span className="font-mono tnum">{formatINR(ev.verdict.counter.max_total_paise)}</span> â€” {ev.verdict.counter.suggestion}
+              Counter: <span className="font-mono tnum">{formatINR(ev.verdict.counter.max_total_paise)}</span> — {ev.verdict.counter.suggestion}
             </p>
           ) : null}
         </li>
@@ -271,7 +271,7 @@ export function ChatPane({ items, busy = false, acceptableOfferId = null, accept
             })}
             {busy ? (
               <li className="animate-write-in text-xs text-ink/70" aria-label="Seller is replying">
-                Seller is replyingâ€¦
+                Seller is replying…
               </li>
             ) : null}
         </ol>

@@ -72,13 +72,13 @@ function MockPay() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
-      <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-ink/70">Test bank Â· mock rails</p>
+      <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-ink/70">Test bank · mock rails</p>
       <Card className="ledger-spine ruled-paper pl-4">
         <CardContent className="space-y-5">
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight">Payment request</h1>
             <p className="mt-1 text-sm text-ink/70">
-              {retry ? `Backup link Â· attempt ${retry}` : "Pay this order on the test rails. Nothing real moves."}
+              {retry ? `Backup link · attempt ${retry}` : "Pay this order on the test rails. Nothing real moves."}
             </p>
           </div>
 
@@ -106,13 +106,13 @@ function MockPay() {
               </div>
             </dl>
           ) : !loadError ? (
-            <p className="text-sm text-ink/70">Loading the orderâ€¦</p>
+            <p className="text-sm text-ink/70">Loading the order…</p>
           ) : null}
 
           {order && !paid && order.status !== "REJECTED" ? (
             <div className="grid gap-3 pt-2">
               <Button size="lg" variant="money" onClick={() => simulate("success")} loading={outcome.kind === "posting"} disabled={outcome.kind === "posting"}>
-                Pay {formatINR(order.amount_paise)} â€” Success
+                Pay {formatINR(order.amount_paise)} — Success
               </Button>
               <Button size="lg" variant="deny-outline" onClick={() => simulate("failure")} disabled={outcome.kind === "posting"}>
                 Simulate Failure
@@ -123,11 +123,11 @@ function MockPay() {
           {outcome.kind === "error" ? <p className="text-sm text-deny">{outcome.message}</p> : null}
 
           {settled && paid ? (
-            <p className="text-sm text-money">Paid. The book already has the entry â€” see it in the Control Tower.</p>
+            <p className="text-sm text-money">Paid. The book already has the entry — see it in the Control Tower.</p>
           ) : null}
           {settled && !paid && order?.held_recovering ? (
             <p className="text-sm text-turmeric">
-              Payment failed at the bank. The order is held and a backup payment link is ready â€” this page is that link. Pay again when ready.
+              Payment failed at the bank. The order is held and a backup payment link is ready — this page is that link. Pay again when ready.
             </p>
           ) : null}
 
@@ -164,7 +164,7 @@ function stampFor(status: string): string {
 
 export default function MockPayPage() {
   return (
-    <Suspense fallback={<main className="mx-auto max-w-md px-6 py-12 text-sm text-ink/70">Loadingâ€¦</main>}>
+    <Suspense fallback={<main className="mx-auto max-w-md px-6 py-12 text-sm text-ink/70">Loading…</main>}>
       <MockPay />
     </Suspense>
   );

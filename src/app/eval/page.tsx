@@ -76,7 +76,7 @@ function reportIn(data: unknown): EvalReport | null {
   return parsed.data;
 }
 
-/** GET /api/eval/latest â†’ { ok, report | null }. A 404 means the route is missing or nothing has run. */
+/** GET /api/eval/latest → { ok, report | null }. A 404 means the route is missing or nothing has run. */
 async function fetchLatest(): Promise<EvalReport | null> {
   try {
     return reportIn(await request("/api/eval/latest"));
@@ -94,7 +94,7 @@ async function fetchScorecard(): Promise<Scorecard> {
   return { report: null, headline: parsed.success ? parsed.data : null };
 }
 
-/** POST /api/eval/run (dev only) â†’ { ok, report }. Takes up to a couple of minutes. */
+/** POST /api/eval/run (dev only) → { ok, report }. Takes up to a couple of minutes. */
 function postRun(): Promise<EvalReport | null> {
   return request("/api/eval/run", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).then(reportIn);
 }
@@ -260,7 +260,7 @@ export default function EvalPage() {
       <main className="mx-auto max-w-6xl px-6 pb-20 pt-10">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink/70">Scorecard Â· measured, not claimed</p>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink/70">Scorecard · measured, not claimed</p>
             <h1 className="mt-2 font-display text-2xl font-bold tracking-tight">Evidence</h1>
           </div>
           {CAN_RUN ? (
@@ -271,8 +271,8 @@ export default function EvalPage() {
         </div>
 
         <div id="eval-status" aria-live="polite" className="mt-3 min-h-[1.25rem] text-sm">
-          {running ? <p className="text-ink/70">Running 100 sessions + 40 attacksâ€¦</p> : null}
-          {!running && load.kind === "loading" ? <p className="text-ink/70">Loading the scorecardâ€¦</p> : null}
+          {running ? <p className="text-ink/70">Running 100 sessions + 40 attacks…</p> : null}
+          {!running && load.kind === "loading" ? <p className="text-ink/70">Loading the scorecard…</p> : null}
           {runError ? <p className="text-deny">{runError}</p> : null}
           {load.kind === "error" ? (
             <p className="text-deny">
@@ -310,13 +310,13 @@ export default function EvalPage() {
 /* ------------------------------------------------------------------ */
 
 function HeroLine({ line }: { line: string }) {
-  const parts = line.split(" Â· ");
+  const parts = line.split(" · ");
   return (
     <p className="mt-8 max-w-5xl font-display text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
       {parts.map((part, i) => (
         <span key={`${i}-${part}`}>
           <span className="inline-block">{part}</span>
-          {i < parts.length - 1 ? <span className="mx-3 text-ink/30">Â·</span> : null}
+          {i < parts.length - 1 ? <span className="mx-3 text-ink/30">·</span> : null}
         </span>
       ))}
     </p>
@@ -342,7 +342,7 @@ function BreachFigure({ attacks, breaches, emphasis }: { attacks: number; breach
   const clean = breaches === 0;
   return (
     <p className={cn("font-display text-3xl font-bold leading-none tracking-tight sm:text-4xl", emphasis > 0 && "animate-write-in")}>
-      <span className="font-mono tnum">{fmtCount(attacks)}</span> attacks â†’{" "}
+      <span className="font-mono tnum">{fmtCount(attacks)}</span> attacks →{" "}
       <span className={clean ? "text-money" : "text-deny"}>
         <span className="font-mono tnum">{fmtCount(breaches)}</span> {breaches === 1 ? "breach" : "breaches"}
       </span>
@@ -368,7 +368,7 @@ function ResultsTable({ report }: { report: EvalReport }) {
     { label: "Orders", value: (s) => fmtCount(s.orders) },
     { label: "Revenue", value: (s) => formatINR(s.revenue_paise), money: true },
     { label: "Average order", value: (s) => formatINR(s.avg_order_paise) },
-    { label: "Upsell", value: (s) => `${formatINR(s.upsell_paise)} Â· ${fmtPct(s.upsell_pct)}` },
+    { label: "Upsell", value: (s) => `${formatINR(s.upsell_paise)} · ${fmtPct(s.upsell_pct)}` },
   ];
 
   return (
@@ -418,12 +418,12 @@ function ResultsTable({ report }: { report: EvalReport }) {
             {uplift.revenue_paise > 0 ? "+" : ""}
             {formatINR(uplift.revenue_paise)}
           </span>{" "}
-          revenue (<span className="font-mono tnum">{fmtPct(uplift.revenue_pct, { sign: true })}</span>) Â·{" "}
+          revenue (<span className="font-mono tnum">{fmtPct(uplift.revenue_pct, { sign: true })}</span>) ·{" "}
           <span className="font-mono tnum">
             {uplift.conversion_pts > 0 ? "+" : ""}
             {Math.round(uplift.conversion_pts * 10) / 10}
           </span>{" "}
-          pts conversion Â· <span className="font-mono tnum">{fmtCount(agentgate.bundles)}</span> bundles closed.
+          pts conversion · <span className="font-mono tnum">{fmtCount(agentgate.bundles)}</span> bundles closed.
         </p>
       </CardContent>
     </Card>
@@ -505,12 +505,12 @@ const RedTeam = forwardRef<HTMLElement, { report: EvalReport; emphasis: number }
                         </td>
                         <td className="py-2.5 pl-3 text-left">
                           {top.length === 0 ? (
-                            <span className="text-ink/70">â€”</span>
+                            <span className="text-ink/70">—</span>
                           ) : (
                             <span className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-xs text-ink/70">
                               {top.map((r) => (
                                 <span key={r.code}>
-                                  {r.code} <span className="text-ink/70">Ã—{r.n}</span>
+                                  {r.code} <span className="text-ink/70">×{r.n}</span>
                                 </span>
                               ))}
                             </span>
@@ -538,7 +538,7 @@ const HeadlineCard = forwardRef<HTMLElement, { headline: EvalHeadline; emphasis:
         <CardContent className="space-y-4">
           <BreachFigure key={emphasis} attacks={headline.attacks} breaches={headline.breaches} emphasis={emphasis} />
           <p className="text-sm text-ink/70">
-            <span className="font-mono tnum text-ink">{fmtPct(headline.explained_pct)}</span> of money actions explained Â·{" "}
+            <span className="font-mono tnum text-ink">{fmtPct(headline.explained_pct)}</span> of money actions explained ·{" "}
             <span className="font-mono tnum text-ink">{fmtPct(headline.revenue_uplift_pct, { sign: true })}</span> revenue vs a static store
           </p>
           <div className="space-y-1 text-xs text-ink/70">
@@ -560,9 +560,9 @@ function Coverage({ report }: { report: EvalReport }) {
     <Card className="ledger-spine ruled-paper pl-[6px]">
       <CardContent className="space-y-2 py-5 text-base">
         <p>
-          <span className="font-mono tnum">{fmtPct(c.with_human_reason_pct)}</span> of money actions carry a reason Â·{" "}
-          <span className="font-mono tnum">{fmtPct(c.with_policy_check_pct)}</span> carry â‰¥1 policy check Â· chain{" "}
-          <span className={cn("font-medium", c.chain_intact ? "text-money" : "text-deny")}>{c.chain_intact ? "âœ“ intact" : "âœ— broken"}</span>
+          <span className="font-mono tnum">{fmtPct(c.with_human_reason_pct)}</span> of money actions carry a reason ·{" "}
+          <span className="font-mono tnum">{fmtPct(c.with_policy_check_pct)}</span> carry ≥1 policy check · chain{" "}
+          <span className={cn("font-medium", c.chain_intact ? "text-money" : "text-deny")}>{c.chain_intact ? "✓ intact" : "✗ broken"}</span>
         </p>
         <p className="text-ink/80">
           <span className="font-mono tnum text-ink">{fmtPct(rt.false_block_rate_pct)}</span> false blocks on{" "}
@@ -588,8 +588,8 @@ function RunMeta({ report }: { report: EvalReport }) {
     <div className="space-y-2 text-xs text-ink/70">
       <p>{report.caveat}</p>
       <p className="font-mono tnum">
-        Last run <time dateTime={report.ran_at}>{fmtWhen(report.ran_at)}</time> Â· seed {report.seed} Â· seller {report.modes.llm} Â· payments{" "}
-        {report.modes.payments} Â· search {report.modes.search}
+        Last run <time dateTime={report.ran_at}>{fmtWhen(report.ran_at)}</time> · seed {report.seed} · seller {report.modes.llm} · payments{" "}
+        {report.modes.payments} · search {report.modes.search}
       </p>
     </div>
   );
