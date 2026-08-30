@@ -1,44 +1,75 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "ghost" | "outline" | "money" | "deny-outline" | "subtle";
-type Size = "sm" | "md" | "lg";
+/**
+ * Button variants.
+ *
+ * Current set: primary · secondary · ghost · outline-blue · danger-outline · payment (alias of primary).
+ * Legacy names (outline · money · deny-outline · subtle) still resolve so older screens keep working.
+ */
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "outline-blue"
+  | "danger-outline"
+  | "payment"
+  /* legacy aliases */
+  | "outline"
+  | "money"
+  | "deny-outline"
+  | "subtle";
+
+export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
-  size?: Size;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
 }
 
-const VARIANT: Record<Variant, string> = {
-  primary: "bg-action text-paper hover:bg-action/90 border border-action",
-  ghost: "bg-transparent text-action hover:bg-action/5 border border-transparent",
-  outline: "bg-transparent text-ink border border-ink/20 hover:border-ink/40",
-  money: "bg-money text-paper hover:bg-money/90 border border-money",
-  "deny-outline": "bg-transparent text-deny border border-deny hover:bg-deny/5",
-  subtle: "bg-ink/5 text-ink hover:bg-ink/10 border border-transparent",
+const BASE =
+  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white " +
+  "disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none";
+
+const VARIANT: Record<ButtonVariant, string> = {
+  primary: "border border-rzp-blue bg-rzp-blue text-white shadow-sm hover:border-rzp-blueHover hover:bg-rzp-blueHover hover:shadow-glow active:bg-rzp-blueDeep",
+  payment: "border border-rzp-blue bg-rzp-blue text-white shadow-sm hover:border-rzp-blueHover hover:bg-rzp-blueHover hover:shadow-glow active:bg-rzp-blueDeep",
+  secondary: "border border-rzp-border bg-white text-rzp-text shadow-sm hover:border-[#C9D6EC] hover:bg-rzp-mist active:bg-rzp-mist2",
+  ghost: "border border-transparent bg-transparent text-rzp-blueDeep hover:bg-rzp-blue/10 active:bg-rzp-blue/15",
+  "outline-blue": "border border-rzp-blue bg-white text-rzp-blueDeep hover:bg-rzp-blue/10 active:bg-rzp-blue/15",
+  "danger-outline": "border border-rzp-red bg-white text-[#B3262C] hover:bg-rzp-red/10 active:bg-rzp-red/15",
+  /* legacy aliases */
+  outline: "border border-rzp-border bg-white text-rzp-text shadow-sm hover:border-[#C9D6EC] hover:bg-rzp-mist active:bg-rzp-mist2",
+  money: "border border-rzp-green bg-rzp-green text-white shadow-sm hover:bg-[#0FA65F] hover:shadow-[0_8px_24px_rgba(18,183,106,0.35)] active:bg-[#0C8F52]",
+  "deny-outline": "border border-rzp-red bg-white text-[#B3262C] hover:bg-rzp-red/10 active:bg-rzp-red/15",
+  subtle: "border border-transparent bg-rzp-mist2 text-rzp-text hover:bg-[#E3EDFF] active:bg-[#D8E5FF]",
 };
 
-const SIZE: Record<Size, string> = {
-  sm: "h-8 px-3 text-sm rounded-lg",
-  md: "h-10 px-4 text-sm rounded-xl",
-  lg: "h-12 px-6 text-base rounded-xl",
+const SIZE: Record<ButtonSize, string> = {
+  sm: "h-8 rounded-lg px-3 text-sm",
+  md: "h-10 rounded-xl px-4 text-sm",
+  lg: "h-12 rounded-xl px-6 text-base",
 };
+
+/** Class string for a button look without the element — use on <Link> or <a>. */
+export function buttonClasses(opts: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}): string {
+  const { variant = "primary", size = "md", className } = opts;
+  return cn(BASE, VARIANT[variant], SIZE[size], className);
+}
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { className, variant = "primary", size = "md", loading = false, disabled, children, ...props },
+  { className, variant = "primary", size = "md", loading = false, disabled, children, type, ...props },
   ref,
 ) {
   return (
     <button
       ref={ref}
+      type={type ?? "button"}
       disabled={disabled || loading}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-        VARIANT[variant],
-        SIZE[size],
-        className,
-      )}
+      aria-busy={loading || undefined}
+      className={buttonClasses({ variant, size, className })}
       {...props}
     >
       {loading ? <Spinner className="h-4 w-4" /> : null}

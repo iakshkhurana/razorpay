@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  /* bahi-khata identity tokens (stamps, ledger spine) */
   --paper: #f6f3ec;
   --ink: #1b1f3a;
   --spine: #7a1f1a;
@@ -11,6 +12,21 @@
   --violet: #6b5ca5;
   --deny: #c0392b;
   --action: #28356a;
+
+  /* product chrome tokens */
+  --rzp-blue: #3395ff;
+  --rzp-blue-hover: #2b7fe0;
+  --rzp-blue-deep: #1e5fbf;
+  --rzp-navy: #0b1d3a;
+  --rzp-text: #14213d;
+  --rzp-muted: #5b6b8c;
+  --rzp-border: #e3eaf5;
+  --rzp-mist: #f4f8ff;
+  --rzp-mist2: #eef4ff;
+  --rzp-green: #12b76a;
+  --rzp-amber: #f59e0b;
+  --rzp-red: #e5484d;
+  --rzp-violet: #7c5cff;
 }
 
 body {
@@ -20,7 +36,7 @@ body {
 
 /* Visible keyboard focus — accessibility floor */
 :focus-visible {
-  outline: 2px solid var(--action);
+  outline: 2px solid var(--rzp-blue);
   outline-offset: 2px;
 }
 
@@ -56,6 +72,103 @@ body {
   background: var(--spine);
   border-radius: 4px 0 0 4px;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Modern surfaces                                                    */
+/* ------------------------------------------------------------------ */
+
+/* Hero gradient with two soft glow spots */
+.bg-hero {
+  background-color: #2f7bff;
+  background-image:
+    radial-gradient(640px 420px at 12% 18%, rgba(255, 255, 255, 0.5), transparent 62%),
+    radial-gradient(560px 400px at 88% 78%, rgba(51, 149, 255, 0.6), transparent 60%),
+    linear-gradient(135deg, #2f7bff 0%, #79b5ff 55%, #dcebff 100%);
+}
+
+/* Faint dotted grid texture — navy dots on light surfaces */
+.bg-dots {
+  background-image: radial-gradient(rgba(11, 29, 58, 0.09) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+/* Faint dotted grid — white dots for use on top of the hero gradient */
+.bg-dots-light {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.28) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+/* Frosted card on gradients */
+.glass {
+  background-color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* Interactive card: lifts a touch and casts a deeper shadow on hover */
+.card-lift {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+.card-lift:hover,
+.card-lift:focus-within {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(20, 33, 61, 0.14);
+}
+
+/* Fade-up on load; stagger with style="--delay: 120ms" */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fade-up 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* Gentle float for illustrations; stagger with --delay, slow down with --float-duration */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.float {
+  animation: float var(--float-duration, 7s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Thin horizontal scrollbars for compact nav rows and wide tables */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(20, 33, 61, 0.2) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(20, 33, 61, 0.2);
+  border-radius: 999px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Signature motion: write-in, stamp press, page flip                 */
+/* ------------------------------------------------------------------ */
 
 /* Ledger entry write-in */
 @keyframes write-in {
@@ -126,8 +239,17 @@ body {
   .animate-write-in,
   .animate-stamp,
   .animate-page-flip,
-  .animate-mic-pulse {
+  .animate-mic-pulse,
+  .animate-float,
+  .animate-fade-up,
+  .animate-pulse,
+  .fade-up,
+  .float {
     animation: none;
+  }
+  .card-lift:hover,
+  .card-lift:focus-within {
+    transform: none;
   }
   * {
     transition-duration: 0.01ms !important;

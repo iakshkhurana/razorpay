@@ -9,6 +9,11 @@ import { getStats } from "@/lib/storefront";
 
 export const dynamic = "force-dynamic";
 
+/** Who speaks for the agents: Sarvam when a key is configured, else the browser's own voices. */
+function voiceMode(): "sarvam" | "browser" {
+  return process.env.SARVAM_API_KEY?.trim() ? "sarvam" : "browser";
+}
+
 /** The newest run recorded in this database, else the committed report from the last CLI run. */
 function evalHeadline(): EvalHeadline | null {
   const run = latestEvalRun<{ headline?: EvalHeadline }>();
@@ -23,6 +28,6 @@ export async function GET() {
     merchant: merchant ? { name: merchant.name, live: merchant.live } : null,
     stats: getStats(),
     eval: evalHeadline(),
-    modes: { llm: llmMode(), payments: paymentsMode(), search: searchMode() },
+    modes: { llm: llmMode(), payments: paymentsMode(), search: searchMode(), voice: voiceMode() },
   });
 }
