@@ -84,9 +84,7 @@ function StackPanel({ item, index, count, progress }: PanelProps) {
             {item.title}
           </h3>
           <p className="text-sm leading-relaxed text-[#5B6B8C] sm:text-base">{item.body}</p>
-          <p className="font-mono text-xs text-[#5B6B8C] tnum">
-            {pad(index + 1)} / {pad(count)}
-          </p>
+          <p className="font-mono text-xs text-[#5B6B8C] tnum">{`${pad(index + 1)} / ${pad(count)}`}</p>
         </div>
         <div
           className="relative order-1 flex min-h-[220px] items-center justify-center overflow-hidden p-6 sm:p-8 lg:order-2"

@@ -5,36 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 import { AgentVoiceToggle } from "@/components/AgentVoiceToggle";
-
-/** Text-only brand: a teal mark with the initials and the wordmark. No image asset. */
-function Wordmark({ variant, size, label }: { variant: "mark" | "light" | "dark"; size: number; label?: string }) {
-  const mark = (
-    <span
-      aria-hidden="true"
-      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-rzp-navy font-display text-[11px] font-bold tracking-wide text-rzp-cyan"
-      style={{ width: size, height: size }}
-    >
-      AG
-    </span>
-  );
-  if (variant === "mark") {
-    return (
-      <span className="inline-flex items-center" aria-label={label ?? "AgentGate"}>
-        {mark}
-      </span>
-    );
-  }
-  return (
-    <Link
-      href="/"
-      className={cn("inline-flex items-center gap-2 rounded-lg", FOCUS_RING, variant === "dark" && "focus-visible:ring-offset-rzp-navy")}
-      aria-label="AgentGate home"
-    >
-      {mark}
-      <span className={cn("font-display text-base font-bold tracking-tight", variant === "dark" ? "text-white" : "text-rzp-text")}>AgentGate</span>
-    </Link>
-  );
-}
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { api, type StatsResponse } from "@/lib/demo/client";
 import { useT } from "@/lib/i18n/core";
@@ -397,6 +367,42 @@ export function Avatar({ name, className }: { name?: string | null; className?: 
 /* ------------------------------------------------------------------ */
 
 const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white";
+
+/**
+ * Text-only brand: a navy tile with the teal initials and the wordmark. No
+ * image asset. `mark` is the tile alone (labelled with the workspace name);
+ * `light` / `dark` link home from white or navy bars.
+ */
+function Wordmark({ variant, size, label }: { variant: "mark" | "light" | "dark"; size: number; label?: string }) {
+  const t = useT(common);
+  const tn = useT(nav);
+  const mark = (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-rzp-navy font-display text-[11px] font-bold tracking-wide text-rzp-cyan"
+      style={{ width: size, height: size }}
+    >
+      AG
+    </span>
+  );
+  if (variant === "mark") {
+    return (
+      <span className="inline-flex items-center" role="img" aria-label={label ?? t("brand.name")}>
+        {mark}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href="/"
+      className={cn("inline-flex items-center gap-2 rounded-lg", FOCUS_RING, variant === "dark" && "focus-visible:ring-offset-rzp-navy")}
+      aria-label={tn("brand.home")}
+    >
+      {mark}
+      <span className={cn("font-display text-base font-bold tracking-tight", variant === "dark" ? "text-white" : "text-rzp-text")}>{t("brand.name")}</span>
+    </Link>
+  );
+}
 
 function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
   const t = useT(common);

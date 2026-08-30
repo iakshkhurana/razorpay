@@ -1,0 +1,221 @@
+import { dict } from "../core";
+
+/**
+ * Buyer simulator copy: the chat pane, order card, mandate passbook, demo
+ * goals and the buyer input. Hindi is Devanagari only; product names,
+ * brand names, reason codes and ₹ amounts stay as written.
+ *
+ * The lines the simulator sends to the seller on the wire (the accept line,
+ * the overspend line) are not here on purpose: they stay English so the
+ * scripted fallback seller's keyword matcher closes deals in every mode.
+ */
+export const simulator = dict({
+  en: {
+    /* page */
+    "page.title": "Buyer simulator",
+    "page.subtitle": "Talk to the seller as an AI buyer. Every price arrives with a verdict.",
+
+    /* chat header */
+    "chat.aria": "Buyer and seller conversation",
+    "chat.sellerAgent": "seller agent",
+    "chat.headerNote": "Every price below has already passed the policy engine.",
+    "chat.mode.gpt": "GPT-4o",
+    "chat.mode.scripted": "Scripted seller",
+    "chat.mode.unknown": "Seller agent",
+    "chat.mode.gptTitle": "Seller agent runs on OpenAI GPT-4o",
+    "chat.mode.scriptedTitle": "Seller agent runs the scripted fallback; no key needed",
+    "chat.mode.unknownTitle": "Waiting for the shop to report its mode",
+    "chat.speaking": "Seller is speaking",
+
+    /* chat body */
+    "chat.empty.title": "No messages yet.",
+    "chat.empty.body": "Run a demo buyer or type a line as the buyer. Every price the seller quotes arrives with a verdict stamp.",
+    "chat.buyer": "Buyer",
+    "chat.seller": "Seller",
+    "chat.thinking": "Seller is thinking…",
+    "chat.verdicts": "Policy verdicts",
+    "chat.counter": "Counter",
+    "chat.accept": "Accept offer",
+
+    /* order card */
+    "order.aria": "Order {{id}}, {{amount}}, {{stamp}}",
+    "order.id": "Order {{id}}",
+    "order.pay": "Pay {{amount}} — Test mode",
+    "order.payBackup": "Pay {{amount}} with backup link — Test mode",
+    "order.rails.razorpay": "Razorpay test rails",
+    "order.rails.mock": "mock rails",
+    "order.rails.test": "test rails",
+    "order.footnote": "Test mode on {{rails}}. No real money moves; every hop is written to the ledger.",
+    "order.line.paid": "Paid. The book already has the entry.",
+    "order.line.rejected": "The owner declined this order. Nothing was charged.",
+    "order.line.failed": "Payment failed at the bank. The order is being held for a backup payment link.",
+    "order.line.held": "Payment failed at the bank. The order is held while a backup payment link is issued.",
+    "order.line.pendingBefore": "Waiting for the owner's call. Approve or reject it in the",
+    "order.line.pendingLink": "Control Tower",
+    "order.line.pendingAfter": ".",
+    "order.line.recovering": "Payment failed at the bank. A backup payment link is ready below.",
+    "order.line.awaiting": "Payment link ready. Pay on the test rails to close the order.",
+    "order.pill.recovering": "Backup link ready",
+    "order.pill.pending": "Owner's call",
+    "order.pill.failed": "Payment failed",
+
+    /* mandate passbook */
+    "mandate.title": "Mandate",
+    "mandate.passbook": "Passbook",
+    "mandate.agent": "Agent",
+    "mandate.for": "For",
+    "mandate.cap": "Cap",
+    "mandate.scope": "Scope",
+    "mandate.expiresIn": "Expires in",
+    "mandate.id": "Mandate id",
+    "mandate.expired": "expired",
+    "mandate.none": "No mandate yet. Issue one to let the buyer in.",
+    "mandate.expiredNote": "This mandate has expired. Issue a fresh one before the buyer talks again.",
+    "mandate.capLabel": "Spend cap for the next mandate",
+    "mandate.custom": "Custom",
+    "mandate.capRupees": "Cap in rupees",
+    "mandate.capError": "Enter a cap in rupees, like 3500.",
+    "mandate.issue": "Issue new mandate",
+    "mandate.scopeNote": "Scope stays handloom, gifts. A new mandate clears the conversation.",
+    "mandate.rail": "Mandate and controls",
+
+    /* demo goals */
+    "goals.title": "Run a demo buyer",
+    "goals.subtitle": "Pick a goal. The buyer only talks; the engine decides.",
+    "goals.error": "Could not load the demo goals. Check that the app is running.",
+    "goals.loading": "Loading demo goals",
+    "goals.group": "Demo goals",
+    "goal.gift.label": "Anniversary gift for mom · {{cap}}",
+    "goal.gift.blurb": "Cotton saree plus a matching blouse. ALLOW, then PAID.",
+    "goal.wedding.label": "Wedding shopping · {{cap}}",
+    "goal.wedding.blurb": "Juttis out of scope, two Banarasis over the cap. DENY, COUNTER, then the owner's call.",
+    "goal.failure.label": "Happy path, then a bank failure · {{cap}}",
+    "goal.failure.blurb": "The bank fails the payment. HELD, backup link, then PAID.",
+
+    /* buyer input */
+    "input.title": "Talk as the buyer",
+    "input.placeholder": "Ask for a saree under ₹2,000…",
+    "input.send": "Send",
+    "input.hint": "Enter sends. The line goes to the seller under the current mandate.",
+
+    /* modes line */
+    "modes.seller": "Seller",
+    "modes.payments": "payments",
+    "modes.voice": "voice",
+    "modes.off": "off",
+    "modes.scriptedNote": "scripted seller, no key needed",
+
+    /* notes in the conversation */
+    "note.mandateIssued": "Mandate issued — {{cap}} on {{scope}}. The buyer may shop.",
+    "note.offline": "The shop did not respond. Check that the app is running.",
+    "note.pollFailed": "Could not refresh the order. Check that the app is running.",
+    "note.issueFirst": "Issue a mandate first — the buyer needs one before it can talk to the shop.",
+    "note.bankFailure": "Simulating a bank failure on the test rails…",
+
+    /* the seller's checkout lines (client-side, spoken aloud) */
+    "reply.duplicate": "This offer was already checked out — here is the same order for {{amount}}.",
+    "reply.pending": "Thank you — {{names}} for {{amount}} is noted. The shop owner will confirm this one shortly.",
+    "reply.done": "Done — {{names}} for {{amount}}. Your payment link is ready; the order is confirmed the moment the bank says yes.",
+    "reply.yourOrder": "your order",
+  },
+  hi: {
+    "page.title": "खरीदार सिम्युलेटर",
+    "page.subtitle": "AI खरीदार बनकर विक्रेता से बात करें। हर दाम एक फ़ैसले के साथ आता है।",
+
+    "chat.aria": "खरीदार और विक्रेता की बातचीत",
+    "chat.sellerAgent": "विक्रेता एजेंट",
+    "chat.headerNote": "नीचे का हर दाम नीति-इंजन से पहले ही गुज़र चुका है।",
+    "chat.mode.gpt": "GPT-4o",
+    "chat.mode.scripted": "स्क्रिप्टेड विक्रेता",
+    "chat.mode.unknown": "विक्रेता एजेंट",
+    "chat.mode.gptTitle": "विक्रेता एजेंट OpenAI GPT-4o पर चल रहा है",
+    "chat.mode.scriptedTitle": "विक्रेता एजेंट स्क्रिप्टेड फ़ॉलबैक पर चल रहा है; key की ज़रूरत नहीं",
+    "chat.mode.unknownTitle": "दुकान के मोड बताने का इंतज़ार",
+    "chat.speaking": "विक्रेता बोल रहा है",
+
+    "chat.empty.title": "अभी कोई संदेश नहीं।",
+    "chat.empty.body": "डेमो खरीदार चलाएँ या खरीदार बनकर एक पंक्ति लिखें। विक्रेता का हर दाम फ़ैसले की मुहर के साथ आता है।",
+    "chat.buyer": "खरीदार",
+    "chat.seller": "विक्रेता",
+    "chat.thinking": "विक्रेता सोच रहा है…",
+    "chat.verdicts": "नीति के फ़ैसले",
+    "chat.counter": "जवाबी ऑफ़र",
+    "chat.accept": "ऑफ़र स्वीकार करें",
+
+    "order.aria": "ऑर्डर {{id}}, {{amount}}, {{stamp}}",
+    "order.id": "ऑर्डर {{id}}",
+    "order.pay": "{{amount}} चुकाएँ — टेस्ट मोड",
+    "order.payBackup": "बैकअप लिंक से {{amount}} चुकाएँ — टेस्ट मोड",
+    "order.rails.razorpay": "Razorpay टेस्ट रेल्स",
+    "order.rails.mock": "मॉक रेल्स",
+    "order.rails.test": "टेस्ट रेल्स",
+    "order.footnote": "{{rails}} पर टेस्ट मोड। असली पैसा नहीं चलता; हर कदम बही-खाते में लिखा जाता है।",
+    "order.line.paid": "भुगतान हो गया। बही-खाते में प्रविष्टि पहले से दर्ज है।",
+    "order.line.rejected": "मालिक ने यह ऑर्डर अस्वीकार किया। कुछ भी नहीं काटा गया।",
+    "order.line.failed": "बैंक में भुगतान विफल हुआ। बैकअप पेमेंट लिंक के लिए ऑर्डर रोका जा रहा है।",
+    "order.line.held": "बैंक में भुगतान विफल हुआ। बैकअप पेमेंट लिंक जारी होने तक ऑर्डर रोका गया है।",
+    "order.line.pendingBefore": "मालिक के फ़ैसले का इंतज़ार। इसे",
+    "order.line.pendingLink": "कंट्रोल टावर",
+    "order.line.pendingAfter": "में मंज़ूर या अस्वीकार करें।",
+    "order.line.recovering": "बैंक में भुगतान विफल हुआ। नीचे बैकअप पेमेंट लिंक तैयार है।",
+    "order.line.awaiting": "पेमेंट लिंक तैयार है। ऑर्डर पूरा करने के लिए टेस्ट रेल्स पर भुगतान करें।",
+    "order.pill.recovering": "बैकअप लिंक तैयार",
+    "order.pill.pending": "मालिक का फ़ैसला",
+    "order.pill.failed": "भुगतान विफल",
+
+    "mandate.title": "मैंडेट",
+    "mandate.passbook": "पासबुक",
+    "mandate.agent": "एजेंट",
+    "mandate.for": "किसके लिए",
+    "mandate.cap": "सीमा",
+    "mandate.scope": "दायरा",
+    "mandate.expiresIn": "समाप्ति में",
+    "mandate.id": "मैंडेट आईडी",
+    "mandate.expired": "समाप्त",
+    "mandate.none": "अभी कोई मैंडेट नहीं। खरीदार को अंदर आने देने के लिए एक जारी करें।",
+    "mandate.expiredNote": "यह मैंडेट समाप्त हो गया है। खरीदार के दोबारा बोलने से पहले नया जारी करें।",
+    "mandate.capLabel": "अगले मैंडेट की खर्च-सीमा",
+    "mandate.custom": "अपनी",
+    "mandate.capRupees": "सीमा रुपयों में",
+    "mandate.capError": "रुपयों में सीमा लिखें, जैसे 3500।",
+    "mandate.issue": "नया मैंडेट जारी करें",
+    "mandate.scopeNote": "दायरा handloom, gifts ही रहता है। नया मैंडेट बातचीत साफ़ कर देता है।",
+    "mandate.rail": "मैंडेट और नियंत्रण",
+
+    "goals.title": "डेमो खरीदार चलाएँ",
+    "goals.subtitle": "एक लक्ष्य चुनें। खरीदार सिर्फ़ बात करता है; फ़ैसला इंजन करता है।",
+    "goals.error": "डेमो लक्ष्य लोड नहीं हो सके। जाँचें कि ऐप चल रहा है।",
+    "goals.loading": "डेमो लक्ष्य लोड हो रहे हैं",
+    "goals.group": "डेमो लक्ष्य",
+    "goal.gift.label": "माँ के लिए सालगिरह का तोहफ़ा · {{cap}}",
+    "goal.gift.blurb": "सूती साड़ी और उसका मैचिंग ब्लाउज़। अनुमति, फिर भुगतान।",
+    "goal.wedding.label": "शादी की खरीदारी · {{cap}}",
+    "goal.wedding.blurb": "जूतियाँ दायरे से बाहर, दो बनारसी सीमा से ऊपर। मना, जवाबी ऑफ़र, फिर मालिक का फ़ैसला।",
+    "goal.failure.label": "सीधा रास्ता, फिर बैंक विफलता · {{cap}}",
+    "goal.failure.blurb": "बैंक भुगतान विफल करता है। रोका गया, बैकअप लिंक, फिर भुगतान।",
+
+    "input.title": "खरीदार बनकर बोलें",
+    "input.placeholder": "₹2,000 से कम की साड़ी माँगें…",
+    "input.send": "भेजें",
+    "input.hint": "Enter भेजता है। पंक्ति मौजूदा मैंडेट के तहत विक्रेता को जाती है।",
+
+    "modes.seller": "विक्रेता",
+    "modes.payments": "पेमेंट",
+    "modes.voice": "आवाज़",
+    "modes.off": "बंद",
+    "modes.scriptedNote": "स्क्रिप्टेड विक्रेता, key की ज़रूरत नहीं",
+
+    "note.mandateIssued": "मैंडेट जारी — {{scope}} पर {{cap}}। खरीदार खरीदारी कर सकता है।",
+    "note.offline": "दुकान ने जवाब नहीं दिया। जाँचें कि ऐप चल रहा है।",
+    "note.pollFailed": "ऑर्डर रीफ़्रेश नहीं हो सका। जाँचें कि ऐप चल रहा है।",
+    "note.issueFirst": "पहले मैंडेट जारी करें — दुकान से बात करने के लिए खरीदार को इसकी ज़रूरत है।",
+    "note.bankFailure": "टेस्ट रेल्स पर बैंक विफलता दिखाई जा रही है…",
+
+    "reply.duplicate": "यह ऑफ़र पहले ही चेकआउट हो चुका है — {{amount}} का वही ऑर्डर यह रहा।",
+    "reply.pending": "धन्यवाद — {{amount}} में {{names}} दर्ज हो गया। दुकान के मालिक इसे जल्द ही पक्का करेंगे।",
+    "reply.done": "हो गया — {{amount}} में {{names}}। आपका पेमेंट लिंक तैयार है; बैंक की हाँ मिलते ही ऑर्डर पक्का।",
+    "reply.yourOrder": "आपका ऑर्डर",
+  },
+});
+
+export type SimulatorKey = keyof typeof simulator.en;

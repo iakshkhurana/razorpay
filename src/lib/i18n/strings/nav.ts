@@ -50,6 +50,9 @@ export const nav = dict({
     "drawer.open": "Open navigation",
     "drawer.close": "Close navigation",
 
+    /* brand link */
+    "brand.home": "AgentGate — home",
+
     /* route loading */
     "progress.label": "Loading the next page",
   },
@@ -90,6 +93,8 @@ export const nav = dict({
 
     "drawer.open": "नेविगेशन खोलें",
     "drawer.close": "नेविगेशन बंद करें",
+
+    "brand.home": "AgentGate — होम",
 
     "progress.label": "अगला पेज लोड हो रहा है",
   },

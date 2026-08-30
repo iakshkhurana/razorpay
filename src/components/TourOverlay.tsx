@@ -1,8 +1,11 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useLocale, useT } from "@/lib/i18n/core";
+import { tour, type TourKey } from "@/lib/i18n/strings/tour";
 import { cn } from "@/lib/utils";
 import { TOUR_END_CARD, TOUR_STEPS, stepAt } from "@/lib/tour/steps";
 import { clearTourStep, dispatchTourAction, readTourStep, tourHref, writeTourStep } from "@/lib/tour/client";
@@ -23,11 +26,16 @@ const END_INDEX = TOTAL;
 /** breathing room after a page mounts before its action fires */
 const DISPATCH_DELAY_MS = 600;
 
+const EASE: [number, number, number, number] = [0.2, 0.7, 0.2, 1];
+
 export function TourOverlay() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const active = searchParams.get("tour") === "1";
+  const t = useT(tour);
+  const { locale } = useLocale();
+  const reduce = useReducedMotion();
 
   // null until sessionStorage is read in an effect, so the first client render
   // matches the server (nothing) and never warns about hydration.
@@ -146,41 +154,57 @@ export function TourOverlay() {
   /* steps completed so far, out of TOTAL — the end card shows a full line */
   const progress = step ? step.n : TOTAL;
   const progressPct = Math.round((progress / TOTAL) * 100);
+  /* the caption in the reader's language; the English script is the source of truth */
+  const caption = step ? (locale === "hi" ? t(`caption.${step.n}` as TourKey) : step.caption) : null;
+  const endCard = locale === "hi" ? t("end.card") : TOUR_END_CARD;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-40">
       <div className="absolute inset-0 bg-rzp-navy/20" aria-hidden="true" />
-      <aside
-        aria-label="Grand Tour"
-        className="glass pointer-events-auto absolute inset-x-4 bottom-20 overflow-hidden rounded-2xl shadow-lift sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[28rem]"
+      <motion.aside
+        aria-label={t("tour.label")}
+        initial={reduce ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: reduce ? 0 : 0.35, ease: EASE }}
+        className="glass pointer-events-auto absolute inset-x-4 bottom-20 overflow-hidden rounded-2xl shadow-lift ring-1 ring-white/70 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[28rem]"
       >
         <div
-          className="h-1 w-full bg-rzp-blue/15"
+          className="h-1 w-full bg-rzp-navy/10"
           role="progressbar"
-          aria-label="Tour progress"
+          aria-label={t("tour.progress")}
           aria-valuemin={0}
           aria-valuemax={TOTAL}
           aria-valuenow={progress}
-          aria-valuetext={`Step ${progress} of ${TOTAL}`}
+          aria-valuetext={t("tour.stepOf", { n: progress, total: TOTAL })}
         >
-          <div className="h-full rounded-r-full bg-rzp-blue transition-[width] duration-500 ease-out" style={{ width: `${progressPct}%` }} />
+          <div className="h-full rounded-r-full bg-gradient-to-r from-rzp-saffron to-[#FFA35C] transition-[width] duration-500 ease-out" style={{ width: `${progressPct}%` }} />
         </div>
 
         {step ? (
           <div className="px-5 pb-4 pt-4">
             <div className="flex items-center justify-between gap-4">
-              <p className="inline-flex items-center gap-2 rounded-full bg-rzp-blue/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-rzp-blueDeep">
-                Grand Tour
+              <p className="inline-flex items-center gap-2 rounded-full border border-rzp-saffron/30 bg-rzp-saffron/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#A03E00]">
+                {t("tour.label")}
                 <span className="font-mono normal-case tracking-normal tnum">
                   {step.n} / {TOTAL}
                 </span>
               </p>
-              <CloseButton onClick={close} />
+              <CloseButton onClick={close} label={t("tour.close")} title={t("tour.closeTitle")} />
             </div>
 
-            <p aria-live="polite" className="mt-3 font-display text-xl font-semibold leading-snug tracking-tight text-rzp-text sm:text-2xl">
-              {step.caption}
-            </p>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.p
+                key={step.n}
+                aria-live="polite"
+                initial={reduce ? false : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? undefined : { opacity: 0, y: -4 }}
+                transition={{ duration: reduce ? 0 : 0.22, ease: EASE }}
+                className="mt-3 font-display text-xl font-semibold leading-snug tracking-tight text-rzp-text sm:text-2xl"
+              >
+                {caption}
+              </motion.p>
+            </AnimatePresence>
 
             <div className="mt-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-1.5" aria-hidden="true">
@@ -189,55 +213,56 @@ export function TourOverlay() {
                     key={s.n}
                     className={cn(
                       "block h-1.5 rounded-full transition-[width,background-color] duration-300",
-                      i === index ? "w-4 bg-rzp-blue" : i < index ? "w-1.5 bg-rzp-blue/50" : "w-1.5 bg-rzp-navy/15",
+                      i === index ? "w-4 bg-rzp-saffron" : i < index ? "w-1.5 bg-rzp-saffron/50" : "w-1.5 bg-rzp-navy/15",
                     )}
                   />
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="secondary" size="sm" className="rounded-full px-3.5" onClick={() => goTo(index - 1)} disabled={index === 0}>
-                  Back
+                <Button type="button" variant="pill-outline" size="sm" className="rounded-full px-3.5" onClick={() => goTo(index - 1)} disabled={index === 0}>
+                  {t("tour.back")}
                 </Button>
-                <Button ref={nextRef} type="button" variant="primary" size="sm" className="rounded-full px-4" onClick={() => goTo(index + 1)}>
-                  Next
+                <Button ref={nextRef} type="button" variant="pill" size="sm" className="rounded-full px-4" onClick={() => goTo(index + 1)}>
+                  {t("tour.next")}
                 </Button>
               </div>
             </div>
+            <p className="mt-3 text-[11px] text-rzp-muted">{t("tour.autoplay")}</p>
           </div>
         ) : (
           <div className="px-5 pb-5 pt-4">
             <div className="flex items-start justify-between gap-4">
-              <p className="inline-flex items-center gap-2 rounded-full bg-rzp-green/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#087443]">
-                Grand Tour · complete
+              <p className="inline-flex items-center gap-2 rounded-full border border-rzp-green/30 bg-rzp-green/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#087443]">
+                {t("tour.complete")}
               </p>
-              <CloseButton onClick={close} />
+              <CloseButton onClick={close} label={t("tour.close")} title={t("tour.closeTitle")} />
             </div>
             <p aria-live="polite" className="mt-3 font-display text-3xl font-bold tracking-tight text-rzp-text">
-              {TOUR_END_CARD}
+              {endCard}
             </p>
-            <p className="mt-2 text-sm text-rzp-muted">Every rupee your AI sells — explained, bounded, and written down.</p>
+            <p className="mt-2 text-sm text-rzp-muted">{t("tour.endSub")}</p>
             <div className="mt-5 flex items-center gap-2">
-              <Button ref={restartRef} type="button" variant="primary" size="md" className="rounded-full px-5" onClick={() => goTo(0)}>
-                Restart tour
+              <Button ref={restartRef} type="button" variant="pill" size="md" className="rounded-full px-5" onClick={() => goTo(0)}>
+                {t("tour.restart")}
               </Button>
-              <Button type="button" variant="secondary" size="md" className="rounded-full px-5" onClick={close}>
-                Close tour
+              <Button type="button" variant="pill-outline" size="md" className="rounded-full px-5" onClick={close}>
+                {t("tour.close")}
               </Button>
             </div>
           </div>
         )}
-      </aside>
+      </motion.aside>
     </div>
   );
 }
 
-function CloseButton({ onClick }: { onClick: () => void }) {
+function CloseButton({ onClick, label, title }: { onClick: () => void; label: string; title: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="Close tour"
-      title="Close tour (Esc)"
+      aria-label={label}
+      title={title}
       className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-rzp-muted transition-colors hover:bg-rzp-navy/10 hover:text-rzp-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2"
     >
       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">

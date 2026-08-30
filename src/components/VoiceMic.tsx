@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n/core";
+import { onboard } from "@/lib/i18n/strings/onboard";
 import { cn } from "@/lib/utils";
 
 /**
@@ -8,7 +10,8 @@ import { cn } from "@/lib/utils";
  * browser has no recognizer or the user refuses the mic: voice only edits
  * policy fields before approval, so it never blocks the flow.
  *
- * Look: blue ring while idle, red pulse while listening.
+ * Look: blue ring while idle, red pulse while listening. Every line follows
+ * the site language; `label` (the idle helper) is the caller's.
  */
 
 interface AlternativeLike {
@@ -45,25 +48,23 @@ function recognitionCtor(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+type MicNote = "noSpeech" | "failed";
+
 export interface VoiceMicProps {
   onTranscript: (text: string) => void;
   disabled?: boolean;
-  /** helper text shown beside the mic while idle */
+  /** helper text shown beside the mic while idle; defaults to the onboarding example line */
   label?: string;
   className?: string;
 }
 
-export function VoiceMic({
-  onTranscript,
-  disabled = false,
-  label = "Boliye: 'minimum price 85% se kam mat karna'",
-  className,
-}: VoiceMicProps) {
+export function VoiceMic({ onTranscript, disabled = false, label, className }: VoiceMicProps) {
+  const t = useT(onboard);
   const [supported, setSupported] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<MicNote | null>(null);
 
   const recognizer = useRef<RecognitionLike | null>(null);
   const finalText = useRef("");
@@ -112,9 +113,9 @@ export function VoiceMic({
       let partial = "";
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
         const r = e.results[i];
-        const t = r?.[0]?.transcript ?? "";
-        if (r?.isFinal) finals += t;
-        else partial += t;
+        const text = r?.[0]?.transcript ?? "";
+        if (r?.isFinal) finals += text;
+        else partial += text;
       }
       if (finals) finalText.current += finals;
       interimText.current = partial;
@@ -124,9 +125,9 @@ export function VoiceMic({
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         setHidden(true);
       } else if (e.error === "no-speech") {
-        setNote("Kuch sunayi nahi diya. Mic dabakar dobara boliye.");
+        setNote("noSpeech");
       } else if (e.error !== "aborted") {
-        setNote("Mic ne kaam nahi kiya. Dobara try karein ya sliders use karein.");
+        setNote("failed");
       }
     };
     rec.onend = () => {
@@ -146,7 +147,7 @@ export function VoiceMic({
     } catch {
       recognizer.current = null;
       setListening(false);
-      setNote("Mic ne kaam nahi kiya. Dobara try karein ya sliders use karein.");
+      setNote("failed");
     }
   }, []);
 
@@ -167,14 +168,14 @@ export function VoiceMic({
         onClick={listening ? stop : start}
         disabled={disabled}
         aria-pressed={listening}
-        aria-label={listening ? "Sunna band karein" : "Boliye — policy ko awaaz se set karein"}
+        aria-label={listening ? t("mic.stop") : t("mic.start")}
         className={cn(
           "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 bg-white transition-[color,border-color,background-color,box-shadow] duration-150",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white",
           "disabled:cursor-not-allowed disabled:opacity-50",
           listening
             ? "animate-mic-pulse border-rzp-red bg-rzp-red/10 text-[#B3262C]"
-            : "border-rzp-blue text-rzp-blueDeep shadow-[0_0_0_4px_rgba(51,149,255,0.14)] hover:bg-rzp-blue/10 hover:shadow-[0_0_0_6px_rgba(51,149,255,0.18)]",
+            : "border-rzp-blue text-rzp-blueDeep shadow-[0_0_0_4px_rgba(47,107,255,0.14)] hover:bg-rzp-blue/10 hover:shadow-[0_0_0_6px_rgba(47,107,255,0.18)]",
         )}
       >
         <MicIcon />
@@ -182,13 +183,13 @@ export function VoiceMic({
       <div className="min-w-0 text-sm" aria-live="polite">
         {listening ? (
           <>
-            <p className="font-medium text-[#B3262C]">Sun raha hoon…</p>
+            <p className="font-medium text-[#B3262C]">{t("mic.listening")}</p>
             {interim ? <p className="truncate text-rzp-muted">{interim}</p> : null}
           </>
         ) : (
-          <p className="text-rzp-muted">{label}</p>
+          <p className="text-rzp-muted">{label ?? t("mic.label1")}</p>
         )}
-        {note && !listening ? <p className="mt-0.5 text-xs text-[#B3262C]">{note}</p> : null}
+        {note && !listening ? <p className="mt-0.5 text-xs text-[#B3262C]">{note === "noSpeech" ? t("mic.noSpeech") : t("mic.failed")}</p> : null}
       </div>
     </div>
   );
