@@ -5,6 +5,7 @@ import { newId } from "../ids";
 import { formatINR } from "../money";
 import {
   type ChatMessage,
+  type Lang,
   type MandateClaims,
   type Offer,
   type Order,
@@ -42,6 +43,22 @@ export const SELLER_HOUSE_RULES = `House rules:
 - Call get_offer (or propose_bundle) before quoting any price; quote only the total the tool returned.
 - An item is unavailable only if search_catalog says in_stock is false. A tool error is not unavailability — fix the arguments and retry.
 - When the buyer accepts an offer, call finalize_checkout with that offer_id and then tell them the payment link is ready.`;
+
+/**
+ * One house-rule line that sets the agents' language on the model path. Hindi
+ * is always Devanagari (Indian voices read it properly and mangle Latin-script
+ * Hinglish); product names and ₹ amounts stay untouched so they match the
+ * catalog and the ledger. The deterministic fallback replies are English in
+ * both modes: they are keyword-matched scripts, not translations.
+ */
+export const LANGUAGE_RULE: Record<Lang, string> = {
+  en: "Reply in English.",
+  hi: "Reply in Hindi written in Devanagari script; keep product names and ₹ amounts as they are.",
+};
+
+export function languageRule(lang: Lang | undefined): string {
+  return LANGUAGE_RULE[lang ?? "en"];
+}
 
 /** Model replies are spoken aloud and rendered as plain text; markdown artefacts are stripped here, once. */
 export function cleanReply(text: string): string {
@@ -147,6 +164,8 @@ export interface SellerTurnInput {
   mandate: MandateClaims;
   message: string;
   now?: number;
+  /** Language of the model-path reply (default English). The deterministic fallback always answers in English. */
+  lang?: Lang;
 }
 
 export interface SellerTurnResult {
@@ -546,7 +565,7 @@ async function llmTurn(input: SellerTurnInput): Promise<SellerTurnResult | null>
   const sink: { offer: Offer | null; order: Order | null } = { offer: null, order: null };
   const signals = injectionSignals(input.message);
   const history: OpenAI.ChatCompletionMessageParam[] = toOpenAIHistory(session.messages);
-  const system = `${SELLER_SYSTEM_PROMPT(merchantName())}\n${SELLER_HOUSE_RULES}\nBuyer mandate: cap ${formatINR(input.mandate.spend_cap_paise)}, scope ${input.mandate.category_scope.join(", ")}.${session.upsell_done ? " The one bundle upsell has already been made." : ""}`;
+  const system = `${SELLER_SYSTEM_PROMPT(merchantName())}\n${SELLER_HOUSE_RULES}\n${languageRule(input.lang)}\nBuyer mandate: cap ${formatINR(input.mandate.spend_cap_paise)}, scope ${input.mandate.category_scope.join(", ")}.${session.upsell_done ? " The one bundle upsell has already been made." : ""}`;
 
   for (let round = 0; round < 5; round += 1) {
     const message = await chatWithTools({ model: "heavy", system, messages: history, tools: TOOLS, temperature: 0.4, timeoutMs: 25_000 });

@@ -2,6 +2,7 @@ import { json } from "@/lib/api";
 import { getMerchant } from "@/lib/db";
 import { chatText, llmMode } from "@/lib/llm/router";
 import { formatINR } from "@/lib/money";
+import { LangSchema, type Lang } from "@/lib/schemas";
 import { getStats, type Stats } from "@/lib/storefront";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,22 @@ export const dynamic = "force-dynamic";
  * The spoken day summary. Hindi is written in Devanagari because Indian TTS
  * voices read it properly and mangle Latin-script Hinglish; English is the
  * fallback for browsers without a Hindi voice.
+ *
+ * `?lang=hi|en` picks the primary text (`text`, echoed with `lang`); both `hi`
+ * and `en` are always in the response. The model only polishes the Hindi when
+ * Hindi is the primary — an English caller gets the template Hindi for free.
  */
+
+function langFrom(req: Request): Lang {
+  let raw: string | null = null;
+  try {
+    raw = new URL(req.url).searchParams.get("lang");
+  } catch {
+    raw = null;
+  }
+  const parsed = LangSchema.safeParse(raw);
+  return parsed.success ? parsed.data : "en";
+}
 
 function hindiTemplate(s: Stats, pending: number): string {
   if (!s.ledger_intact) return "सावधान — खाते में छेड़छाड़ का निशान मिला है। कृपया Control Tower में लेजर की जाँच करें।";
@@ -63,10 +79,12 @@ async function hindiFromModel(s: Stats, pending: number, merchant: string): Prom
   });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const lang = langFrom(req);
   const stats = getStats();
   const pending = stats.pending_approvals;
   const merchant = getMerchant()?.name ?? "the shop";
-  const hi = (await hindiFromModel(stats, pending, merchant)) ?? hindiTemplate(stats, pending);
-  return json({ ok: true, hi, en: englishTemplate(stats, pending), source: llmMode() });
+  const en = englishTemplate(stats, pending);
+  const hi = (lang === "hi" ? await hindiFromModel(stats, pending, merchant) : null) ?? hindiTemplate(stats, pending);
+  return json({ ok: true, lang, text: lang === "hi" ? hi : en, hi, en, source: llmMode() });
 }

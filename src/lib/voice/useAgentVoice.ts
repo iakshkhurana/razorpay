@@ -16,7 +16,11 @@ export type VoiceProvider = "sarvam" | "browser" | "none";
 export interface AgentVoice {
   enabled: boolean;
   toggle: () => void;
-  /** Queues `text`; resolves when it has been spoken (or skipped). `lang` defaults to script detection. */
+  /**
+   * Queues `text`; resolves when it has been spoken (or skipped).
+   * `lang` defaults to script detection: Devanagari → "hi-IN", anything else → "en-IN".
+   * The same tag is what Sarvam receives as target_language_code via /api/tts.
+   */
   speak: (text: string, lang?: SpeechLang) => Promise<void>;
   stop: () => void;
   /** the browser can speak on its own */
@@ -165,9 +169,21 @@ async function speakNow(text: string, lang: SpeechLang, myEpoch: number): Promis
   if (state.supported) await speakBrowser(spoken, lang);
 }
 
+/**
+ * The language a line is spoken in. The script wins over the hint: Devanagari
+ * text asked for as "en-IN" would be read letter-by-letter by an English
+ * voice, so it goes to the Hindi voice regardless. English text keeps the
+ * caller's hint (a Hindi voice reads English well enough for a mixed line).
+ */
+export function resolveSpeechLang(text: string, hint?: SpeechLang): SpeechLang {
+  const detected = detectLang(text);
+  if (detected === "hi-IN") return "hi-IN";
+  return hint ?? detected;
+}
+
 function speak(text: string, lang?: SpeechLang): Promise<void> {
   const myEpoch = epoch;
-  const resolved = lang ?? detectLang(text);
+  const resolved = resolveSpeechLang(text, lang);
   const run = queue.then(() => speakNow(text, resolved, myEpoch)).catch(() => undefined);
   queue = run;
   return run;
