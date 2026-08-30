@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ChatVerdict, LedgerStamp, ShieldCheck, Storefront } from "@/components/illustrations";
@@ -8,7 +7,7 @@ import { MarketingFooter } from "@/components/landing/MarketingFooter";
 import { MarketingHeader } from "@/components/landing/MarketingHeader";
 import { StatsBand } from "@/components/landing/StatsBand";
 import { MiniLedger } from "@/components/MiniLedger";
-import { BrowserFrame, IndustryTabs, Marquee, Reveal, StickyFeatures, WatermarkFooter } from "@/components/motion";
+import { BrowserFrame, IndustryTabs, Marquee, Reveal, StickyFeatures } from "@/components/motion";
 import { VerdictStamp } from "@/components/VerdictStamp";
 import { api, type StatsResponse } from "@/lib/demo/client";
 import { useT } from "@/lib/i18n/core";
@@ -267,24 +266,6 @@ export default function LandingPage() {
         <StatsBand stats={stats} loading={loading} />
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-20" id="partner">
-        <Reveal>
-          <div className="relative overflow-hidden rounded-3xl border border-rzp-border bg-rzp-ice shadow-card">
-            <div className="relative aspect-[16/9] w-full sm:aspect-[21/9]">
-              <Image src="/images/partner-hub.jpg" alt={t("partner.alt")} fill sizes="(max-width: 1152px) 100vw, 1152px" className="object-cover object-[60%_20%]" priority={false} />
-            </div>
-            <div className="absolute bottom-5 left-5 max-w-sm rounded-2xl border border-white/70 bg-white/85 p-5 backdrop-blur">
-              <Eyebrow>{t("partner.eyebrow")}</Eyebrow>
-              <h2 className="mt-1 font-display text-xl font-bold text-rzp-navy">{t("partner.title")}</h2>
-              <p className="mt-1 text-sm text-rzp-muted">{t("partner.body")}</p>
-              <Link href="/onboard" className="mt-3 inline-flex text-sm font-semibold text-rzp-blueDeep hover:underline">
-                {t("partner.cta")} →
-              </Link>
-            </div>
-          </div>
-        </Reveal>
-      </section>
-
       <section className="mx-auto max-w-6xl px-6" id="product">
         <Reveal>
           <Eyebrow>{t("features.eyebrow")}</Eyebrow>
@@ -415,7 +396,20 @@ export default function LandingPage() {
       </section>
 
       <MarketingFooter />
-      <WatermarkFooter text="AgentGate" image="/images/industry-retail.jpg" />
+      <div className="overflow-hidden bg-white px-4 pt-6" aria-hidden="true">
+        <p
+          className="select-none whitespace-nowrap text-center font-display font-bold uppercase leading-[0.8] tracking-tight text-transparent"
+          style={{
+            fontSize: "18vw",
+            marginBottom: "-0.22em",
+            backgroundImage: "linear-gradient(180deg, #2F6BFF 0%, #A9CCFF 55%, #FFFFFF 100%)",
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+          }}
+        >
+          AgentGate
+        </p>
+      </div>
     </div>
   );
 }
