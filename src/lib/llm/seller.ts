@@ -35,6 +35,62 @@ Attempt exactly ONE relevant bundle upsell per conversation, never more.
 If a tool returns verdict COUNTER: apologise warmly in one line and present the counter offer. If GATE: say the shop owner will confirm shortly. If DENY: explain the human_reason politely and suggest an in-scope alternative.
 Keep every reply ≤3 sentences, warm and plain. No emojis except at most one when a deal closes.`;
 
+/** Operating rules layered under the verbatim prompt so the model behaves like a product, not a chatbot. */
+export const SELLER_HOUSE_RULES = `House rules:
+- Plain text only: no markdown, no bold markers, no bullet or numbered lists, no links. Write prices as ₹1,499.
+- Use sku_id values exactly as search_catalog returned them. Never guess an id.
+- Call get_offer (or propose_bundle) before quoting any price; quote only the total the tool returned.
+- An item is unavailable only if search_catalog says in_stock is false. A tool error is not unavailability — fix the arguments and retry.
+- When the buyer accepts an offer, call finalize_checkout with that offer_id and then tell them the payment link is ready.`;
+
+/** Model replies are spoken aloud and rendered as plain text; markdown artefacts are stripped here, once. */
+export function cleanReply(text: string): string {
+  return text
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,!?]|$)/g, "$1$2")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*(?:[-*•]|\d+[.)])\s+/gm, "")
+    .replace(/\s*\n\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function slugTokens(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/^sku[_-]/, "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+/**
+ * Maps whatever the model called a product (an exact id, a slug, a name) onto
+ * real catalog ids. Anything that does not match is reported, never guessed.
+ */
+export function resolveSkuIds(ids: string[], catalog: Sku[]): { resolved: string[]; unknown: string[] } {
+  const resolved: string[] = [];
+  const unknown: string[] = [];
+  for (const raw of ids) {
+    const exact = catalog.find((s) => s.id === raw);
+    if (exact) {
+      resolved.push(exact.id);
+      continue;
+    }
+    const tokens = slugTokens(raw);
+    const match =
+      catalog.find((s) => slugTokens(s.id).join("-") === tokens.join("-")) ??
+      catalog.find((s) => {
+        const name = slugTokens(s.name);
+        return tokens.length > 0 && tokens.every((t) => name.includes(t));
+      });
+    if (match) resolved.push(match.id);
+    else unknown.push(raw);
+  }
+  return { resolved, unknown };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Session state                                                      */
 /* ------------------------------------------------------------------ */
@@ -436,7 +492,11 @@ async function runTool(
   if (name === "get_offer") {
     const a = OfferArgs.safeParse(args);
     if (!a.success) return { error: "sku_ids[] and qty are required" };
-    const r = makeOffer({ mandate: input.mandate, sku_ids: a.data.sku_ids, qty: a.data.qty, discount_pct: a.data.discount_pct, actor: "seller_agent", now: input.now });
+    const ids = resolveSkuIds(a.data.sku_ids, catalog);
+    if (ids.unknown.length > 0) {
+      return { error: `Unknown sku_id: ${ids.unknown.join(", ")}. Use sku_id exactly as search_catalog returned it.`, available_sku_ids: catalog.map((s) => s.id) };
+    }
+    const r = makeOffer({ mandate: input.mandate, sku_ids: ids.resolved, qty: a.data.qty, discount_pct: a.data.discount_pct, actor: "seller_agent", now: input.now });
     events.push(eventFor(r));
     sink.offer = r.offer;
     session.last_offer_id = r.offer.id;
@@ -447,9 +507,12 @@ async function runTool(
     if (session.upsell_done) return { error: "The one bundle upsell for this conversation was already made." };
     const a = BundleArgs.safeParse(args);
     if (!a.success) return { error: "anchor_sku_id and addon_sku_id are required" };
-    if (!catalog.some((s) => s.id === a.data.addon_sku_id)) return { error: "addon_sku_id not in catalog" };
+    const ids = resolveSkuIds([a.data.anchor_sku_id, a.data.addon_sku_id], catalog);
+    if (ids.unknown.length > 0) {
+      return { error: `Unknown sku_id: ${ids.unknown.join(", ")}. Use sku_id exactly as search_catalog returned it.`, available_sku_ids: catalog.map((s) => s.id) };
+    }
     session.upsell_done = true;
-    const r = makeOffer({ mandate: input.mandate, sku_ids: [a.data.anchor_sku_id, a.data.addon_sku_id], qty: a.data.qty ?? 1, is_bundle: true, actor: "seller_agent", now: input.now });
+    const r = makeOffer({ mandate: input.mandate, sku_ids: ids.resolved, qty: a.data.qty ?? 1, is_bundle: true, actor: "seller_agent", now: input.now });
     events.push(eventFor(r));
     sink.offer = r.offer;
     session.last_offer_id = r.offer.id;
@@ -483,7 +546,7 @@ async function llmTurn(input: SellerTurnInput): Promise<SellerTurnResult | null>
   const sink: { offer: Offer | null; order: Order | null } = { offer: null, order: null };
   const signals = injectionSignals(input.message);
   const history: OpenAI.ChatCompletionMessageParam[] = toOpenAIHistory(session.messages);
-  const system = `${SELLER_SYSTEM_PROMPT(merchantName())}\nBuyer mandate: cap ${formatINR(input.mandate.spend_cap_paise)}, scope ${input.mandate.category_scope.join(", ")}.${session.upsell_done ? " The one bundle upsell has already been made." : ""}`;
+  const system = `${SELLER_SYSTEM_PROMPT(merchantName())}\n${SELLER_HOUSE_RULES}\nBuyer mandate: cap ${formatINR(input.mandate.spend_cap_paise)}, scope ${input.mandate.category_scope.join(", ")}.${session.upsell_done ? " The one bundle upsell has already been made." : ""}`;
 
   for (let round = 0; round < 5; round += 1) {
     const message = await chatWithTools({ model: "heavy", system, messages: history, tools: TOOLS, temperature: 0.4, timeoutMs: 25_000 });
@@ -491,7 +554,7 @@ async function llmTurn(input: SellerTurnInput): Promise<SellerTurnResult | null>
     history.push(message as OpenAI.ChatCompletionMessageParam);
     const calls = message.tool_calls ?? [];
     if (calls.length === 0) {
-      const text = message.content?.trim();
+      const text = cleanReply(message.content ?? "");
       if (!text) return null;
       const next: SessionState = { ...session, messages: [...session.messages, { role: "seller", content: text }] };
       persistSession(next);
