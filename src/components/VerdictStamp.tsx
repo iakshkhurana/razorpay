@@ -13,7 +13,7 @@ const STYLE: Record<StampKind, { label: string; className: string }> = {
   GATE: { label: "OWNER'S CALL", className: "border-violet text-violet" },
   DENY: { label: "DENY", className: "border-deny text-deny" },
   FAILED: { label: "FAILED", className: "border-deny text-deny" },
-  INFO: { label: "NOTED", className: "border-ink/40 text-ink/60" },
+  INFO: { label: "NOTED", className: "border-ink/40 text-ink/70" },
 };
 
 const SIZE = {
@@ -34,8 +34,8 @@ export interface VerdictStampProps {
 }
 
 /**
- * Rubber-stamp badge: uppercase, letterspaced, 1.5px border, rotated -2°,
- * pressed on with the stamp animation. The label is always text — never colour alone.
+ * Rubber-stamp badge: uppercase, letterspaced, 1.5px border, rotated -2Â°,
+ * pressed on with the stamp animation. The label is always text â€” never colour alone.
  */
 export function VerdictStamp({ kind, size = "md", animate = true, className }: VerdictStampProps) {
   const k = stampKindFor(kind);

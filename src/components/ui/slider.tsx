@@ -37,7 +37,7 @@ export function Slider({ id, label, value, min, max, step = 1, format, onChange,
         className="h-2 w-full cursor-pointer appearance-none rounded-full bg-ink/10 accent-action"
         aria-valuetext={display}
       />
-      {hint ? <p className="mt-1 text-xs text-ink/50">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-ink/70">{hint}</p> : null}
     </div>
   );
 }
