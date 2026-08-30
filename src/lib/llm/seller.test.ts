@@ -15,7 +15,7 @@ import { DEFAULT_POLICY, type ChatMessage, type MandateClaims, type Order, type 
 import { indexCatalog } from "../search";
 import { applyPaymentEvent, recordMandateIssued, recordShopLive } from "../storefront";
 import { DEMO_GOALS, scriptedBuyerNext, type BuyerState, type DemoGoal } from "./buyer";
-import { loadSession, parseRequestedQty, pickUpsell, sellerTurn } from "./seller";
+import { chooseAnchor, loadSession, mentionsSku, parseBudgetPaise, parseRequestedQty, pickUpsell, sellerTurn } from "./seller";
 
 const NOW = 1_800_000_000;
 const seed = skusFromCsv(fs.readFileSync(path.join(process.cwd(), "data", "seed", "ramesh-catalog.csv"), "utf8"));
@@ -188,6 +188,33 @@ describe("helpers", () => {
     const cotton = seed.find((s) => s.name.includes("Cotton"))!;
     expect(pickUpsell(banarasi, seed, "for a wedding")?.name).toBe("Handwoven Stole");
     expect(pickUpsell(cotton, seed, "gift for mom")?.name).toBe("Matching Blouse Piece");
+  });
+
+  it("reads a stated budget from the message", () => {
+    expect(parseBudgetPaise("anniversary gift for mom, budget ₹2000")).toBe(200000);
+    expect(parseBudgetPaise("something under Rs. 1,500")).toBe(150000);
+    expect(parseBudgetPaise("koi accha tohfa ₹800 tak")).toBe(80000);
+    expect(parseBudgetPaise("show me sarees")).toBeNull();
+  });
+
+  it("knows when the buyer named a product", () => {
+    const banarasi = seed.find((s) => s.name.includes("Banarasi"))!;
+    const jutti = seed.find((s) => s.name.includes("Jutti"))!;
+    const zari = seed.find((s) => s.name.includes("Zari"))!;
+    expect(mentionsSku("I want the Banarasi silk saree", banarasi)).toBe(true);
+    expect(mentionsSku("Do you have golden juttis?", jutti)).toBe(true);
+    expect(mentionsSku("anniversary gift for mom, budget 2000", zari)).toBe(false);
+  });
+
+  it("picks the best-ranked item that fits the budget for a generic ask, but honours an explicit one", () => {
+    const zari = seed.find((s) => s.name.includes("Zari"))!;
+    const cotton = seed.find((s) => s.name.includes("Cotton"))!;
+    const banarasi = seed.find((s) => s.name.includes("Banarasi"))!;
+    const mandate = mandateFor(DEMO_GOALS[0]);
+    const ranked = [{ sku: zari }, { sku: cotton }, { sku: banarasi }];
+    expect(chooseAnchor(ranked, "anniversary gift for mom, budget 2000", mandate)?.name).toBe("Cotton Handloom Saree");
+    expect(chooseAnchor([{ sku: banarasi }, { sku: cotton }], "I want the Banarasi silk saree", mandate)?.name).toBe("Banarasi Silk Saree");
+    expect(chooseAnchor([{ sku: banarasi }], "anything nice", mandate)?.name).toBe("Banarasi Silk Saree");
   });
 
   it("session state round-trips through the database", async () => {
