@@ -165,8 +165,8 @@ Point a test-mode webhook at `https://<ngrok>/api/webhook/razorpay` for `payment
 {
   "mcpServers": {
     "agentgate": {
-      "command": "npx",
-      "args": ["tsx", "K:/hacks/razorpay/mcp/server.ts"],
+      "command": "cmd",
+      "args": ["/c", "npx", "tsx", "K:/hacks/razorpay/mcp/server.ts"],
       "env": { "AGENTGATE_URL": "http://localhost:3000" }
     }
   }

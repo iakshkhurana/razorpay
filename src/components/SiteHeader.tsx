@@ -29,7 +29,7 @@ export function SiteHeader({ right }: { right?: React.ReactNode }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                  active ? "bg-ink/5 text-ink" : "text-ink/60 hover:text-ink",
+                  active ? "bg-ink/5 text-ink" : "text-ink/70 hover:text-ink",
                 )}
               >
                 {item.label}

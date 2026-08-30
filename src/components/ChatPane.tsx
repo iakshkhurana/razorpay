@@ -104,7 +104,7 @@ function OrderStatusLine({ order }: { order: OrderCard }) {
     return <p className="text-sm text-turmeric">Payment failed at the bank. A backup payment link is ready below.</p>;
   }
   if (order.status === "AWAITING_PAYMENT") {
-    return <p className="text-sm text-ink/60">Payment link ready. Pay on the test rails to close the order.</p>;
+    return <p className="text-sm text-ink/70">Payment link ready. Pay on the test rails to close the order.</p>;
   }
   return null;
 }
@@ -119,7 +119,7 @@ function OrderCardView({ order }: { order: OrderCard }) {
     >
       <div className="space-y-2.5 px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink/50">Order</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink/70">Order</span>
           <span className="truncate font-mono text-xs tnum text-ink/70" title={order.id}>
             {order.id}
           </span>
@@ -159,12 +159,12 @@ function StampRow({ events }: { events: VerdictEvent[] }) {
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <VerdictStamp kind={ev.verdict.decision} size="sm" />
             <span className="font-mono text-sm tnum text-ink">{formatINR(ev.amount_paise)}</span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink/40">{ev.action}</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink/70">{ev.action}</span>
           </div>
           <p className="mt-1 leading-snug">{ev.verdict.human_reason}</p>
           {ev.verdict.counter ? (
             <p className="mt-0.5 leading-snug text-turmeric">
-              Counter: <span className="font-mono tnum">{formatINR(ev.verdict.counter.max_total_paise)}</span> — {ev.verdict.counter.suggestion}
+              Counter: <span className="font-mono tnum">{formatINR(ev.verdict.counter.max_total_paise)}</span> â€” {ev.verdict.counter.suggestion}
             </p>
           ) : null}
         </li>
@@ -206,14 +206,14 @@ export function ChatPane({ items, busy = false, acceptableOfferId = null, accept
     <section aria-label="Buyer and seller conversation" className={cn("flex min-h-0 flex-col rounded-xl border border-ink/10 bg-white/40", className)}>
       <div className="flex items-center justify-between border-b border-ink/10 px-4 py-2.5">
         <h2 className="font-display text-base font-semibold tracking-tight">Conversation</h2>
-        <p className="text-xs text-ink/50">Stamps land the moment policy speaks.</p>
+        <p className="text-xs text-ink/70">Stamps land the moment policy speaks.</p>
       </div>
 
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {items.length === 0 && !busy ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
             <p className="font-display text-lg font-semibold tracking-tight">No messages yet.</p>
-            <p className="mt-1 max-w-sm text-sm text-ink/60">Run the demo buyer or type a line as the buyer. Every price the seller quotes arrives with a verdict stamp.</p>
+            <p className="mt-1 max-w-sm text-sm text-ink/70">Run the demo buyer or type a line as the buyer. Every price the seller quotes arrives with a verdict stamp.</p>
           </div>
         ) : null}
         {/* the live region stays mounted so assistive tech announces the first message too */}
@@ -222,7 +222,7 @@ export function ChatPane({ items, busy = false, acceptableOfferId = null, accept
               if (item.kind === "buyer") {
                 return (
                   <li key={item.id} className="flex animate-write-in flex-col items-end">
-                    <span className="mb-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-ink/45">Buyer</span>
+                    <span className="mb-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-ink/70">Buyer</span>
                     <div className="max-w-[80%] rounded-xl rounded-br-sm bg-action/10 px-4 py-2.5 text-sm text-ink">{item.text}</div>
                   </li>
                 );
@@ -231,7 +231,7 @@ export function ChatPane({ items, busy = false, acceptableOfferId = null, accept
                 const acceptable = Boolean(onAcceptOffer && item.offer && acceptableOfferId && item.offer.id === acceptableOfferId);
                 return (
                   <li key={item.id} className="flex animate-write-in flex-col items-start">
-                    <span className="mb-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-ink/45">Seller</span>
+                    <span className="mb-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-ink/70">Seller</span>
                     <div className="max-w-[88%] rounded-xl rounded-bl-sm border border-ink/10 bg-white/70 px-4 py-2.5 text-sm text-ink">
                       <p className="leading-relaxed">{item.text}</p>
                       <StampRow events={item.events} />
@@ -240,7 +240,7 @@ export function ChatPane({ items, busy = false, acceptableOfferId = null, accept
                           <Button size="sm" onClick={() => onAcceptOffer?.(item.offer as ChatOffer)} loading={accepting} disabled={accepting}>
                             Accept offer
                           </Button>
-                          <span className="ml-2 font-mono text-xs tnum text-ink/60">{formatINR(item.offer.total_paise)}</span>
+                          <span className="ml-2 font-mono text-xs tnum text-ink/70">{formatINR(item.offer.total_paise)}</span>
                         </div>
                       ) : null}
                     </div>
@@ -262,7 +262,7 @@ export function ChatPane({ items, busy = false, acceptableOfferId = null, accept
                     item.tone === "deny" && "text-deny",
                     item.tone === "turmeric" && "text-turmeric",
                     item.tone === "money" && "text-money",
-                    item.tone === "ink" && "text-ink/55",
+                    item.tone === "ink" && "text-ink/70",
                   )}
                 >
                   {item.text}
@@ -270,8 +270,8 @@ export function ChatPane({ items, busy = false, acceptableOfferId = null, accept
               );
             })}
             {busy ? (
-              <li className="animate-write-in text-xs text-ink/50" aria-label="Seller is replying">
-                Seller is replying…
+              <li className="animate-write-in text-xs text-ink/70" aria-label="Seller is replying">
+                Seller is replyingâ€¦
               </li>
             ) : null}
         </ol>

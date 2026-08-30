@@ -202,6 +202,16 @@ export async function checkout(input: { mandate: MandateClaims; offer_id: string
   }
 
   const existing = getOrderByIdempotencyKey(idempotencyKey(mandate_id, offer.id));
+  if (!existing && listOrders({ status: "PENDING_APPROVAL" }).some((o) => o.mandate_id === mandate_id)) {
+    const verdict: Verdict = {
+      decision: "DENY",
+      reason_code: "MANDATE_REPLAY",
+      human_reason: "This mandate already has an order waiting for the owner. One mandate, one order at a time.",
+      policy_checks: [{ rule: "mandate_replay", result: "fail", detail: "pending approval exists" }],
+    };
+    const entry = recordVerdict({ mandate_id, action: "checkout", amount_paise: offer.total_paise, verdict });
+    return { ok: false, verdict, order: null, entry };
+  }
   if (existing) {
     const entry = appendEntry({
       actor: "system",

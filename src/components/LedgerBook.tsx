@@ -39,7 +39,7 @@ function timeOf(ts: string): string {
 }
 
 function shortHash(h: string): string {
-  return `${h.slice(0, 6)}…${h.slice(-4)}`;
+  return `${h.slice(0, 6)}â€¦${h.slice(-4)}`;
 }
 
 /**
@@ -80,7 +80,7 @@ export function LedgerBook({ entries, view, emptyText, className, maxHeight = "6
         style={{ maxHeight }}
       >
         {entries.length === 0 ? (
-          <p className="px-6 py-10 text-center text-sm text-ink/60">{emptyText ?? "Ledger abhi khaali hai — run the demo buyer to write the first entry."}</p>
+          <p className="px-6 py-10 text-center text-sm text-ink/70">{emptyText ?? "Ledger abhi khaali hai â€” run the demo buyer to write the first entry."}</p>
         ) : (
           <ol className="divide-y divide-ink/5">
             {entries.map((e) => (
@@ -92,7 +92,7 @@ export function LedgerBook({ entries, view, emptyText, className, maxHeight = "6
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <p className={cn("leading-snug", compact ? "text-sm" : "text-base")}>{e.plain ?? e.human_reason}</p>
-                      <p className="mt-1 text-xs text-ink/45">{timeOf(e.ts)}</p>
+                      <p className="mt-1 text-xs text-ink/70">{timeOf(e.ts)}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <span className="font-mono text-sm tnum">{e.amount_paise ? formatINR(e.amount_paise) : ""}</span>
@@ -102,14 +102,14 @@ export function LedgerBook({ entries, view, emptyText, className, maxHeight = "6
                 ) : (
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1 font-mono text-[11px] leading-relaxed text-ink/80">
-                      <div className="flex flex-wrap gap-x-3 text-ink/50">
+                      <div className="flex flex-wrap gap-x-3 text-ink/70">
                         <span>{timeOf(e.ts)}</span>
                         <span>{e.actor}</span>
                         <span>{e.action}</span>
-                        <span title={e.mandate_id}>{e.mandate_id ? e.mandate_id.slice(0, 14) : "—"}</span>
+                        <span title={e.mandate_id}>{e.mandate_id ? e.mandate_id.slice(0, 14) : "â€”"}</span>
                       </div>
                       <div className="mt-1 text-ink">
-                        {e.reason_code} · {e.human_reason}
+                        {e.reason_code} Â· {e.human_reason}
                       </div>
                       {e.policy_checks && e.policy_checks.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
@@ -117,16 +117,16 @@ export function LedgerBook({ entries, view, emptyText, className, maxHeight = "6
                             <span
                               key={`${e.id}-${c.rule}`}
                               className={cn(
-                                c.result === "fail" ? "text-deny" : c.result === "skip" ? "text-ink/40" : "text-money",
+                                c.result === "fail" ? "text-deny" : c.result === "skip" ? "text-ink/70" : "text-money",
                               )}
                             >
-                              {c.result === "fail" ? "✗" : c.result === "skip" ? "·" : "✓"} {c.rule}
+                              {c.result === "fail" ? "âœ—" : c.result === "skip" ? "Â·" : "âœ“"} {c.rule}
                             </span>
                           ))}
                         </div>
                       ) : null}
-                      <div className="mt-1 text-ink/40">
-                        {shortHash(e.prev_hash)} → {shortHash(e.hash)}
+                      <div className="mt-1 text-ink/70">
+                        {shortHash(e.prev_hash)} â†’ {shortHash(e.hash)}
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
