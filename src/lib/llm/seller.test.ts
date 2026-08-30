@@ -15,7 +15,7 @@ import { DEFAULT_POLICY, type ChatMessage, type MandateClaims, type Order, type 
 import { indexCatalog } from "../search";
 import { applyPaymentEvent, recordMandateIssued, recordShopLive } from "../storefront";
 import { DEMO_GOALS, scriptedBuyerNext, type BuyerState, type DemoGoal } from "./buyer";
-import { chooseAnchor, loadSession, mentionsSku, parseBudgetPaise, parseRequestedQty, pickUpsell, sellerTurn } from "./seller";
+import { chooseAnchor, cleanReply, loadSession, mentionsSku, parseBudgetPaise, parseRequestedQty, pickUpsell, resolveSkuIds, sellerTurn } from "./seller";
 
 const NOW = 1_800_000_000;
 const seed = skusFromCsv(fs.readFileSync(path.join(process.cwd(), "data", "seed", "ramesh-catalog.csv"), "utf8"));
@@ -215,6 +215,21 @@ describe("helpers", () => {
     expect(chooseAnchor(ranked, "anniversary gift for mom, budget 2000", mandate)?.name).toBe("Cotton Handloom Saree");
     expect(chooseAnchor([{ sku: banarasi }, { sku: cotton }], "I want the Banarasi silk saree", mandate)?.name).toBe("Banarasi Silk Saree");
     expect(chooseAnchor([{ sku: banarasi }], "anything nice", mandate)?.name).toBe("Banarasi Silk Saree");
+  });
+
+  it("strips markdown from model replies", () => {
+    expect(cleanReply("Consider the **Handwoven Stole** for ₹649.")).toBe("Consider the Handwoven Stole for ₹649.");
+    expect(cleanReply("Options:\n1. **Brass Diya Gift Set** - ₹499\n2. **Cotton Handloom Saree** - ₹1,499")).toBe(
+      "Options: Brass Diya Gift Set - ₹499 Cotton Handloom Saree - ₹1,499",
+    );
+    expect(cleanReply("Pay [here](http://x/y) now.")).toBe("Pay here now.");
+    expect(cleanReply("## Deal\n`ord_1` is ready")).toBe("Deal ord_1 is ready");
+  });
+
+  it("resolves model-invented product ids onto the catalog and reports the rest", () => {
+    const r = resolveSkuIds(["phulkari_dupatta", "sku_cotton-handloom-saree", "Handwoven Stole", "laptop"], seed);
+    expect(r.resolved).toEqual(["sku_phulkari-dupatta", "sku_cotton-handloom-saree", "sku_handwoven-stole"]);
+    expect(r.unknown).toEqual(["laptop"]);
   });
 
   it("session state round-trips through the database", async () => {

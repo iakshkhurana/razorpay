@@ -1,6 +1,7 @@
 import { formatINR } from "../money";
 import type { ChatMessage, VerdictEvent } from "../schemas";
 import { chatText, llmMode } from "./router";
+import { cleanReply } from "./seller";
 
 /**
  * The buyer simulator. A scripted buyer drives the three demo goals offline;
@@ -118,7 +119,8 @@ export async function buyerNext(state: BuyerState, user_ref = "priya@example.com
   }
   if (messages.length === 0) messages.push({ role: "user", content: "The seller is ready. Say what you are looking for." });
 
-  const text = await chatText({ model: "light", system, messages, temperature: 0, max_tokens: 120 });
-  if (!text) return { ...scripted, mode: "fallback" };
-  return { message: text, done: false, reason: "model", mode: "openai" };
+  const text = await chatText({ model: "light", system: `${system}\nPlain text only — no markdown, no lists.`, messages, temperature: 0, max_tokens: 120 });
+  const cleaned = text ? cleanReply(text) : "";
+  if (!cleaned) return { ...scripted, mode: "fallback" };
+  return { message: cleaned, done: false, reason: "model", mode: "openai" };
 }
