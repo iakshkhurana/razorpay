@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import { listSkus } from "./db";
@@ -247,7 +248,9 @@ function tensorRows(output: unknown, expectedRows: number): Float32Array[] {
 
 async function createEmbedder(): Promise<Embedder> {
   const { env, pipeline } = await import("@xenova/transformers");
-  env.cacheDir = path.join(process.cwd(), ".cache", "transformers");
+  env.cacheDir = process.env.VERCEL
+    ? path.join(os.tmpdir(), "agentgate", "transformers")
+    : path.join(process.cwd(), ".cache", "transformers");
   env.allowLocalModels = true;
   const extractor = await pipeline("feature-extraction", EMBEDDING_MODEL, { quantized: true });
   return async (texts) => {
