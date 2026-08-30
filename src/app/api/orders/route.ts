@@ -1,17 +1,26 @@
 import { error, json, parseBody } from "@/lib/api";
 import { getOrder } from "@/lib/db";
 import { ApprovalRequestSchema, OrderStatusSchema } from "@/lib/schemas";
-import { approvalQueue, orderView, ownerDecision, recentOrders } from "@/lib/storefront";
+import { paymentsMode } from "@/lib/payments";
+import { approvalQueue, orderView, ownerDecision, recentOrders, reconcileOrder } from "@/lib/storefront";
 
 export const dynamic = "force-dynamic";
 
-/** GET ?id= for one order, ?status=PENDING_APPROVAL for the queue, otherwise recent orders. */
+/**
+ * GET ?id= for one order (in Razorpay mode an awaiting order is reconciled
+ * against the provider first), ?status=PENDING_APPROVAL for the queue,
+ * otherwise recent orders.
+ */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
   if (id) {
     const order = getOrder(id);
     if (!order) return error("Order not found.", 404);
+    if (paymentsMode() === "razorpay" && order.status === "AWAITING_PAYMENT") {
+      const reconciled = await reconcileOrder(id);
+      if (reconciled) return json({ ok: true, order: orderView(reconciled.order), reconciled: reconciled.changed });
+    }
     return json({ ok: true, order: orderView(order) });
   }
   const status = url.searchParams.get("status");
