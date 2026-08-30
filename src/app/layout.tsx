@@ -5,6 +5,7 @@ import {
   Spline_Sans_Mono,
   Noto_Sans_Devanagari,
 } from "next/font/google";
+import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -42,7 +43,7 @@ export default function RootLayout({
       <body
         className={`${display.variable} ${body.variable} ${mono.variable} ${devanagari.variable} font-body bg-paper text-ink antialiased`}
       >
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );
