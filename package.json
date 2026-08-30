@@ -11,6 +11,7 @@
     "test": "vitest run",
     "seed": "tsx scripts/seed.ts",
     "eval": "tsx scripts/run-eval.ts",
+    "verify:live": "tsx scripts/verify-live.ts",
     "demo:reset": "tsx scripts/seed.ts",
     "mcp": "tsx mcp/server.ts"
   },
