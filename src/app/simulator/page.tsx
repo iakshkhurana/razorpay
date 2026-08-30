@@ -34,15 +34,15 @@ const POLL_MS = 2000;
 const POLL_TIMEOUT_MS = 3 * 60 * 1000;
 const WEBHOOK_DELAY_MS = 1500;
 
-const ACCEPT_LINE = "Yes, that works â€” I'll take it.";
+const ACCEPT_LINE = "Yes, that works — I'll take it.";
 const OVERSPEND_LINE = "I want the Banarasi silk saree";
 const OFFLINE_LINE = "The shop did not respond. Check that the app is running.";
 
 /** Used by the tour when the goals request has not returned. Mirrors the server's gift goal. */
 const FALLBACK_GIFT_GOAL: DemoGoalView = {
   key: "gift",
-  label: "Anniversary gift for mom Â· â‚¹2,000",
-  goal: "anniversary gift for mom, budget â‚¹2000",
+  label: "Anniversary gift for mom · ₹2,000",
+  goal: "anniversary gift for mom, budget ₹2000",
   cap_paise: DEFAULT_CAP_PAISE,
   scope: DEFAULT_SCOPE,
 };
@@ -115,9 +115,9 @@ function checkoutReply(res: CheckoutResponse): string {
   if (!res.order) return res.verdict.human_reason;
   const amount = formatINR(res.order.amount_paise);
   const names = res.order.sku_names.length > 0 ? res.order.sku_names.join(" + ") : "your order";
-  if (res.duplicate) return `This offer was already checked out â€” here is the same order for ${amount}.`;
-  if (res.order.status === "PENDING_APPROVAL") return `Thank you â€” ${names} for ${amount} is noted. The shop owner will confirm this one shortly.`;
-  return `Done â€” ${names} for ${amount}. Your payment link is ready; the order is confirmed the moment the bank says yes.`;
+  if (res.duplicate) return `This offer was already checked out — here is the same order for ${amount}.`;
+  if (res.order.status === "PENDING_APPROVAL") return `Thank you — ${names} for ${amount} is noted. The shop owner will confirm this one shortly.`;
+  return `Done — ${names} for ${amount}. Your payment link is ready; the order is confirmed the moment the bank says yes.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,7 +283,7 @@ export default function SimulatorPage() {
         setMandate(active);
         setExpired(false);
         sessionRef.current = undefined;
-        addNote(`Mandate issued â€” ${formatINR(res.mandate.spend_cap_paise)} on ${res.mandate.scope}. The buyer may shop.`);
+        addNote(`Mandate issued — ${formatINR(res.mandate.spend_cap_paise)} on ${res.mandate.scope}. The buyer may shop.`);
         return active;
       } catch (err) {
         if (gen === genRef.current) addNote(describeError(err), "deny");
@@ -455,7 +455,7 @@ export default function SimulatorPage() {
             if (goal.key === "failure" && res.order.status === "AWAITING_PAYMENT") {
               await sleep(WEBHOOK_DELAY_MS);
               if (gen !== genRef.current) return;
-              addNote("Simulating a bank failure on the test railsâ€¦", "turmeric");
+              addNote("Simulating a bank failure on the test rails…", "turmeric");
               await simulateBank(res.order.id, "failure", gen);
             }
             break;
@@ -484,7 +484,7 @@ export default function SimulatorPage() {
     if (!text || running) return;
     const active = mandateRef.current;
     if (!active) {
-      addNote("Issue a mandate first â€” the buyer needs one before it can talk to the shop.", "deny");
+      addNote("Issue a mandate first — the buyer needs one before it can talk to the shop.", "deny");
       return;
     }
     setDraft("");
@@ -654,7 +654,7 @@ export default function SimulatorPage() {
           <div>
             <h1 className="font-display text-3xl font-bold tracking-tight">Buyer simulator</h1>
             <p className="mt-1 max-w-2xl text-sm text-ink/70">
-              An AI buyer shops under a signed mandate. Every price the seller quotes has already passed the policy engine â€” the stamps land as it speaks.
+              An AI buyer shops under a signed mandate. Every price the seller quotes has already passed the policy engine — the stamps land as it speaks.
             </p>
           </div>
         </div>
@@ -760,7 +760,7 @@ export default function SimulatorPage() {
                         Cap in rupees
                       </Label>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-ink/70">â‚¹</span>
+                        <span className="font-mono text-sm text-ink/70">₹</span>
                         <Input
                           id="custom-cap"
                           inputMode="numeric"
@@ -792,7 +792,7 @@ export default function SimulatorPage() {
                   <p className="mt-0.5 text-xs text-ink/70">Pick a goal. The buyer only talks; the engine decides.</p>
                 </div>
                 {goalsError ? <p className="text-sm text-deny">{goalsError}</p> : null}
-                {goals.length === 0 && !goalsError ? <p className="text-xs text-ink/70">Loading goalsâ€¦</p> : null}
+                {goals.length === 0 && !goalsError ? <p className="text-xs text-ink/70">Loading goals…</p> : null}
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Demo goals">
                   {goals.map((goal) => {
                     const active = runningGoal === goal.key;
@@ -825,7 +825,7 @@ export default function SimulatorPage() {
                   <Input
                     id="buyer-line"
                     value={draft}
-                    placeholder="Ask for a saree under â‚¹2,000â€¦"
+                    placeholder="Ask for a saree under ₹2,000…"
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.nativeEvent.isComposing) {
@@ -847,9 +847,9 @@ export default function SimulatorPage() {
             {/* 4. Modes */}
             <p className="px-1 text-xs text-ink/70">
               Modes: seller{" "}
-              <span className="font-mono text-ink/80">{shownSellerMode ?? "â€”"}</span> Â· payments{" "}
-              <span className="font-mono text-ink/80">{modes?.payments ?? "â€”"}</span>
-              {shownSellerMode === "fallback" ? <span> Â· scripted seller, no key needed</span> : null}
+              <span className="font-mono text-ink/80">{shownSellerMode ?? "—"}</span> · payments{" "}
+              <span className="font-mono text-ink/80">{modes?.payments ?? "—"}</span>
+              {shownSellerMode === "fallback" ? <span> · scripted seller, no key needed</span> : null}
             </p>
           </aside>
         </div>
