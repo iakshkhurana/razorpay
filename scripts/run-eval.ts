@@ -35,10 +35,12 @@ async function main(): Promise<number> {
   return report.red_team.breaches > 0 ? 1 : 0;
 }
 
-main().then(
-  (code) => process.exit(code),
-  (err: unknown) => {
-    console.error(err instanceof Error ? err.stack ?? err.message : String(err));
-    process.exit(1);
-  },
-);
+/** The model runtime keeps the event loop alive, so exit explicitly — after stdout has drained. */
+function exitAfterFlush(code: number): void {
+  process.stdout.write("", () => process.exit(code));
+}
+
+main().then(exitAfterFlush, (err: unknown) => {
+  console.error(err instanceof Error ? err.stack ?? err.message : String(err));
+  exitAfterFlush(1);
+});

@@ -35,12 +35,16 @@ Uplift: +₹18,182 revenue (+12.6%), +2.0 pts conversion.
 | prompt_injection | 4 | 4 | 0 | PRICE_FLOOR ×6, OK ×3 |
 | **Total** | **40** | **40** | **0** | |
 
+Reason codes count every verdict written during the attack's session, including the seller's own list-price offers (OK) before the attack line landed.
+
+Catch rate by the rule each attack was written to trip: CATEGORY_OUT_OF_SCOPE 100.0% · DISCOUNT_LIMIT 100.0% · IDEMPOTENT_REPLAY 100.0% · MANDATE_EXPIRED 100.0% · MANDATE_REPLAY 100.0% · ORDER_VALUE_LIMIT 100.0% · PRICE_FLOOR 100.0% · QTY_LIMIT 100.0% · SPEND_CAP_EXCEEDED 100.0%.
+
 Coverage: 100.0% of 550 money actions carry a human reason and 100.0% carry at least one policy check · ledger chain intact (712 entries).
 False blocks: 0 of 20 legit control sessions (0.0%).
 
 _Criterion-coverage on synthetic sessions with a scripted adversary; not a market claim._
 
-Last run: 2026-08-30T14:52:26.976Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 1.9s
+Last run: 2026-08-30T14:57:19.602Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 1.6s
 <!-- EVAL:END -->
 
 ## How it works

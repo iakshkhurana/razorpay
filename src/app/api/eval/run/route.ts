@@ -12,7 +12,7 @@ export const runtime = "nodejs";
  * database open, so the eval runs as a child process (`npx tsx
  * scripts/run-eval.ts`) against its own database and hands the report back
  * through data/eval-latest.json. The report is then copied into the app
- * database so /api/stats and the landing page pick up the headline.
+ * database so /api/eval/latest can serve it even if the file is cleaned up.
  */
 
 const RUN_TIMEOUT_MS = 5 * 60_000;

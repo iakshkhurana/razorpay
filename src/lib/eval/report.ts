@@ -60,6 +60,11 @@ function reasonCodesCell(codes: Record<string, number>): string {
   return entries.length > 0 ? entries.map(([code, n]) => `${code} ×${n}`).join(", ") : "—";
 }
 
+function catchRateLine(rates: Record<string, number>): string {
+  const entries = Object.entries(rates).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+  return entries.length > 0 ? entries.map(([code, rate]) => `${code} ${pct(rate)}`).join(" · ") : "—";
+}
+
 export function renderMarkdown(report: EvalReport): string {
   const { benchmark: b, red_team: rt, coverage: c } = report;
   const lines: string[] = [];
@@ -86,6 +91,11 @@ export function renderMarkdown(report: EvalReport): string {
     lines.push(`| ${row.category} | ${row.attempted} | ${row.caught} | ${row.breaches} | ${reasonCodesCell(row.reason_codes)} |`);
   }
   lines.push(`| **Total** | **${rt.attacks}** | **${rt.caught}** | **${rt.breaches}** | |`, "");
+  lines.push(
+    "Reason codes count every verdict written during the attack's session, including the seller's own list-price offers (OK) before the attack line landed.",
+    "",
+  );
+  lines.push(`Catch rate by the rule each attack was written to trip: ${catchRateLine(rt.catch_rate_by_reason)}.`, "");
 
   lines.push(
     `Coverage: ${pct(c.with_human_reason_pct)} of ${c.money_actions} money actions carry a human reason and ${pct(c.with_policy_check_pct)} carry at least one policy check · ledger chain ${c.chain_intact ? "intact" : "BROKEN"} (${c.ledger_entries} entries).`,
@@ -106,8 +116,9 @@ export function renderMarkdown(report: EvalReport): string {
 
 /**
  * Replaces everything between the EVAL markers with the rendered report,
- * keeping the markers. Missing markers are appended at the end of the file.
- * Nothing outside the markers is touched.
+ * keeping the markers. With no marker pair the block is appended at the end of
+ * the file; a lone marker is dropped first so nothing between it and the new
+ * block can be swallowed on the next run. Nothing else is touched.
  */
 export function writeReadme(report: EvalReport, readmePath = path.join(process.cwd(), "README.md")): void {
   const block = `${EVAL_START}\n${renderMarkdown(report)}\n${EVAL_END}`;
@@ -119,7 +130,7 @@ export function writeReadme(report: EvalReport, readmePath = path.join(process.c
   if (start >= 0 && end >= 0) {
     next = existing.slice(0, start) + block + existing.slice(end + EVAL_END.length);
   } else {
-    const trimmed = existing.replace(/\s+$/, "");
+    const trimmed = existing.replace(EVAL_START, "").replace(EVAL_END, "").replace(/\s+$/, "");
     next = trimmed.length > 0 ? `${trimmed}\n\n${block}\n` : `${block}\n`;
   }
   fs.writeFileSync(readmePath, next, "utf8");
