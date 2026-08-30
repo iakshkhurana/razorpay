@@ -67,6 +67,10 @@ export class MockPaymentPort implements PaymentPort {
     return { ok: true, event };
   }
 
+  async fetchStatus(): Promise<"unknown"> {
+    return "unknown";
+  }
+
   async issueFallbackLink(input: FallbackLinkInput): Promise<PaymentHandle> {
     const { order_id, attempt } = FallbackLinkInputSchema.parse(input);
     return {

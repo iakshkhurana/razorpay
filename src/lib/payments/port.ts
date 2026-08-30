@@ -53,11 +53,19 @@ export type VerifyWebhookResult =
   | { ok: true; event: PaymentEvent }
   | { ok: false; error: string; reason: VerifyFailureReason };
 
+export type PaymentStatus = "paid" | "pending" | "failed" | "unknown";
+
 export interface PaymentPort {
   readonly mode: PaymentsMode;
   createOrder(input: CreateOrderInput): Promise<PaymentHandle>;
   verifyWebhook(rawBody: string, signature: string | null): VerifyWebhookResult;
   issueFallbackLink(input: FallbackLinkInput): Promise<PaymentHandle>;
+  /**
+   * Asks the provider for the current state of a payment. Lets a deployment
+   * without a reachable webhook URL still confirm payments from the source of
+   * truth; the mock adapter has no out-of-band state and reports "unknown".
+   */
+  fetchStatus(payment_ref: string): Promise<PaymentStatus>;
 }
 
 /* ------------------------------------------------------------------ */
