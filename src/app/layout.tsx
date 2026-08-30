@@ -5,7 +5,9 @@ import {
   Spline_Sans_Mono,
   Noto_Sans_Devanagari,
 } from "next/font/google";
+import { Suspense } from "react";
 import { ToastProvider } from "@/components/ui/toast";
+import { TourOverlay } from "@/components/TourOverlay";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -43,7 +45,12 @@ export default function RootLayout({
       <body
         className={`${display.variable} ${body.variable} ${mono.variable} ${devanagari.variable} font-body bg-paper text-ink antialiased`}
       >
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          {children}
+          <Suspense fallback={null}>
+            <TourOverlay />
+          </Suspense>
+        </ToastProvider>
       </body>
     </html>
   );
