@@ -92,6 +92,7 @@ npm run dev                 # http://localhost:3000
 | `npm run lint` | ESLint |
 | `npm run seed` / `npm run demo:reset` | Reset the database to the demo shop |
 | `npm run eval` | 100-session benchmark + 40-attack red team → rewrites the scorecard above |
+| `npm run verify:live` | Exercise the real OpenAI seller and a Razorpay test Payment Link with your keys |
 | `npm run mcp` | Stdio MCP server exposing search / offer / checkout |
 
 ### Environment
@@ -156,6 +157,10 @@ ngrok http 3000
 ```
 
 Point a test-mode webhook at `https://<ngrok>/api/webhook/razorpay` for `payment_link.paid` and `payment.failed` with the secret from `.env`. Payment Links carry `reference_id = mandate_id:offer_id`; the test netbanking page's Success / Failure buttons drive the same FAILED → HELD → backup-link path as the mock bank. If the keys are missing the app warns and falls back to mock.
+
+**No tunnel?** The app also reconciles from Razorpay's own record: while an order is awaiting payment, every poll of `GET /api/orders?id=…` asks Razorpay for the Payment Link status and only a provider-reported *paid* becomes PAID. So on localhost with just the keys, the happy path completes without a webhook; the failure → HELD path needs the webhook (a failed attempt leaves the link open on Razorpay's side).
+
+`npm run verify:live` checks both integrations with your keys in one go: a real gpt-4o seller conversation against an in-memory shop, and a real test-mode Payment Link with its current status.
 
 ## MCP server
 
