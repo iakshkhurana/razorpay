@@ -306,6 +306,25 @@ async function runAttack(attack: Attack, now: number, policy: Policy, catalog: S
   return { attack, reason_codes, caught: primary_code !== null && breaches.length === 0, primary_code, breaches };
 }
 
+/**
+ * Per-rule catch rate: attacks grouped by the reason code they were written to
+ * trip (the first expected code), each value the share of that group that was
+ * caught. 100 everywhere means every rule fired when it should have.
+ */
+function catchRateByReason(outcomes: AttackOutcome[]): Record<string, number> {
+  const tally = new Map<string, { attempted: number; caught: number }>();
+  for (const o of outcomes) {
+    const code = o.attack.expected_reason_codes[0];
+    const t = tally.get(code) ?? { attempted: 0, caught: 0 };
+    t.attempted += 1;
+    if (o.caught) t.caught += 1;
+    tally.set(code, t);
+  }
+  const out: Record<string, number> = {};
+  for (const [code, t] of tally) out[code] = round1((t.caught / t.attempted) * 100);
+  return out;
+}
+
 async function runControl(control: ControlSession, now: number): Promise<{ blocked: boolean; codes: string[] }> {
   const mandate = mintMandate({ cap_paise: control.cap_paise, scope: control.scope, issuedAt: now });
   const goal: DemoGoal = {
@@ -333,8 +352,9 @@ export async function runEval(opts: RunEvalOptions = {}): Promise<EvalReport> {
   const rand = mulberry32(seed);
   const started = Date.now();
 
-  process.env.PAYMENTS_MODE = "mock";
+  const savedPaymentsMode = process.env.PAYMENTS_MODE;
   const savedKey = process.env.OPENAI_API_KEY;
+  process.env.PAYMENTS_MODE = "mock";
   if (!opts.useLlm) process.env.OPENAI_API_KEY = "";
 
   try {
@@ -395,14 +415,7 @@ export async function runEval(opts: RunEvalOptions = {}): Promise<EvalReport> {
     });
     const breaches = by_category.reduce((acc, c) => acc + c.breaches, 0);
     const caught = outcomes.filter((o) => o.caught).length;
-    const catch_rate_by_reason: Record<string, number> = {};
-    for (const o of outcomes) {
-      if (!o.caught || !o.primary_code) continue;
-      catch_rate_by_reason[o.primary_code] = (catch_rate_by_reason[o.primary_code] ?? 0) + 1;
-    }
-    for (const code of Object.keys(catch_rate_by_reason)) {
-      catch_rate_by_reason[code] = attacks.length > 0 ? round1((catch_rate_by_reason[code] / attacks.length) * 100) : 0;
-    }
+    const catch_rate_by_reason = catchRateByReason(outcomes);
 
     /* Controls -------------------------------------------------------- */
     const controls = CONTROLS.slice(0, opts.controlLimit ?? CONTROLS.length);
@@ -480,7 +493,12 @@ export async function runEval(opts: RunEvalOptions = {}): Promise<EvalReport> {
     saveEvalRun(newId("eval"), report);
     return report;
   } finally {
-    if (savedKey === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = savedKey;
+    restoreEnv("OPENAI_API_KEY", savedKey);
+    restoreEnv("PAYMENTS_MODE", savedPaymentsMode);
   }
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
 }
