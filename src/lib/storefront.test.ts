@@ -19,6 +19,7 @@ import {
   makeOffer,
   orderView,
   ownerDecision,
+  reconcileOrder,
   recordMandateIssued,
   recordShopLive,
 } from "./storefront";
@@ -206,6 +207,19 @@ describe("flow 3 — graceful failure", () => {
     const paid = await applyPaymentEvent({ type: "captured", payment_ref: "any", order_id: result.order.id, amount_paise: null, raw_event: "mock.success" });
     expect(paid.ok && paid.order.status).toBe("PAID");
     expect(verifyChain()).toBeNull();
+  });
+
+  it("reconciling an awaiting order on the mock rails changes nothing", async () => {
+    const mandate = newMandate(200000);
+    const offer = makeOffer({ mandate, sku_ids: [SAREE], qty: 1, now: NOW });
+    const result = await checkout({ mandate, offer_id: offer.offer.id, now: NOW });
+    if (!result.ok) throw new Error("checkout failed");
+    const before = listEntries().length;
+    const r = await reconcileOrder(result.order.id);
+    expect(r?.changed).toBe(false);
+    expect(r?.order.status).toBe("AWAITING_PAYMENT");
+    expect(listEntries().length).toBe(before);
+    expect(await reconcileOrder("ghost")).toBeNull();
   });
 
   it("a failure webhook for an unknown order is refused without touching the book", async () => {

@@ -380,6 +380,37 @@ export async function applyPaymentEvent(event: PaymentEvent): Promise<PaymentEve
   return { ok: true, order: current, duplicate: false };
 }
 
+/**
+ * Confirms an awaiting order from the provider's own record. Used when no
+ * webhook can reach this server (local Razorpay test mode without a tunnel):
+ * the client polls, we ask Razorpay, and only a provider-reported "paid"
+ * becomes PAID. Mock payments report "unknown" and nothing changes.
+ */
+export async function reconcileOrder(order_id: string): Promise<{ order: Order; changed: boolean } | null> {
+  const order = getOrder(order_id);
+  if (!order) return null;
+  if (order.status !== "AWAITING_PAYMENT" || !order.payment_ref) return { order, changed: false };
+
+  const port = getPaymentPort();
+  let status: Awaited<ReturnType<typeof port.fetchStatus>>;
+  try {
+    status = await port.fetchStatus(order.payment_ref);
+  } catch {
+    return { order, changed: false };
+  }
+  if (status !== "paid" && status !== "failed") return { order, changed: false };
+
+  const result = await applyPaymentEvent({
+    type: status === "paid" ? "captured" : "failed",
+    payment_ref: order.payment_ref,
+    order_id: order.id,
+    amount_paise: order.amount_paise,
+    raw_event: `${port.mode}.reconcile.${status}`,
+  });
+  if (!result.ok) return { order, changed: false };
+  return { order: result.order, changed: !result.duplicate };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Owner decisions                                                    */
 /* ------------------------------------------------------------------ */

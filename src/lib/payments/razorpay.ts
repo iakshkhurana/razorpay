@@ -13,6 +13,7 @@ import {
   type FallbackLinkInput,
   type PaymentEvent,
   type PaymentHandle,
+  type PaymentStatus,
   type PaymentPort,
   type RazorpayWebhook,
   type VerifyWebhookResult,
@@ -86,6 +87,7 @@ export interface RazorpayClientLike {
   paymentLink: {
     create(params: PaymentLinkCreate): Promise<PaymentLink>;
     all(params?: { count?: number; skip?: number }): Promise<{ payment_links: PaymentLink[] }>;
+    fetch(paymentLinkId: string): Promise<PaymentLink>;
   };
 }
 
@@ -189,6 +191,28 @@ export class RazorpayPaymentPort implements PaymentPort {
       );
     }
     return existing;
+  }
+
+  /** Payment Link status from Razorpay: paid / partially_paid → paid; expired / cancelled → failed. */
+  async fetchStatus(payment_ref: string): Promise<PaymentStatus> {
+    let link: PaymentLink;
+    try {
+      link = await this.getClient().paymentLink.fetch(payment_ref);
+    } catch (err) {
+      throw toProviderError(err, "fetchStatus");
+    }
+    switch (link.status) {
+      case "paid":
+      case "partially_paid":
+        return "paid";
+      case "expired":
+      case "cancelled":
+        return "failed";
+      case "created":
+        return "pending";
+      default:
+        return "unknown";
+    }
   }
 
   verifyWebhook(rawBody: string, signature: string | null): VerifyWebhookResult {
