@@ -40,7 +40,7 @@ export function readTourStep(): number {
   try {
     const raw = window.sessionStorage.getItem(TOUR_STORAGE_KEY);
     const n = raw === null ? 0 : Number(raw);
-    return Number.isInteger(n) && n >= 0 && n < TOUR_STEPS.length ? n : 0;
+    return Number.isInteger(n) && n >= 0 && n <= TOUR_STEPS.length ? n : 0;
   } catch {
     return 0;
   }
