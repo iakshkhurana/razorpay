@@ -105,7 +105,12 @@ RAZORPAY_WEBHOOK_SECRET=whsec_demo
 MANDATE_JWT_SECRET=minimum-32-chars-change-me-please
 PAYMENTS_MODE=mock                         # mock | razorpay
 APP_URL=http://localhost:3000
+SARVAM_API_KEY=                            # optional; Indic voice for the agents (browser voices otherwise)
 ```
+
+## Voice and language
+
+The agents speak. With `SARVAM_API_KEY` set, `POST /api/tts` synthesises speech with Sarvam `bulbul:v3` (Hindi and Indian English); without it the browser's own Indian voices are used. The site is bilingual — the language toggle switches the UI between English and Hindi (Devanagari), the seller and buyer agents reply in the selected language on the model path, and the voice follows the script of the text (Devanagari → Hindi voice, English → English voice). "Aaj ka summary" on the Control Tower reads a Hindi summary written from the real ledger, never Latin-script Hinglish.
 
 ## The three demo flows
 
