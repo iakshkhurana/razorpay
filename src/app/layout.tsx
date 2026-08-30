@@ -6,8 +6,10 @@ import {
   Noto_Sans_Devanagari,
 } from "next/font/google";
 import { Suspense } from "react";
-import { ToastProvider } from "@/components/ui/toast";
+import { RouteProgress } from "@/components/RouteProgress";
 import { TourOverlay } from "@/components/TourOverlay";
+import { ToastProvider } from "@/components/ui/toast";
+import { LocaleProvider } from "@/lib/i18n/core";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -35,6 +37,10 @@ export const metadata: Metadata = {
   title: "AgentGate — Har paisa, likha hua.",
   description:
     "Every rupee your AI sells — explained, bounded, and written down. Safe agentic commerce for small merchants on Razorpay rails.",
+  icons: {
+    icon: "/images/favicon.png",
+    apple: "/images/favicon.png",
+  },
 };
 
 export default function RootLayout({
@@ -45,12 +51,15 @@ export default function RootLayout({
       <body
         className={`${display.variable} ${body.variable} ${mono.variable} ${devanagari.variable} font-body bg-paper text-ink antialiased`}
       >
-        <ToastProvider>
-          {children}
-          <Suspense fallback={null}>
-            <TourOverlay />
-          </Suspense>
-        </ToastProvider>
+        <LocaleProvider>
+          <ToastProvider>
+            <RouteProgress />
+            {children}
+            <Suspense fallback={null}>
+              <TourOverlay />
+            </Suspense>
+          </ToastProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

@@ -1,16 +1,52 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
+import { AgentVoiceToggle } from "@/components/AgentVoiceToggle";
+
+/** Text-only brand: a teal mark with the initials and the wordmark. No image asset. */
+function Wordmark({ variant, size, label }: { variant: "mark" | "light" | "dark"; size: number; label?: string }) {
+  const mark = (
+    <span
+      aria-hidden="true"
+      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-rzp-navy font-display text-[11px] font-bold tracking-wide text-rzp-cyan"
+      style={{ width: size, height: size }}
+    >
+      AG
+    </span>
+  );
+  if (variant === "mark") {
+    return (
+      <span className="inline-flex items-center" aria-label={label ?? "AgentGate"}>
+        {mark}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href="/"
+      className={cn("inline-flex items-center gap-2 rounded-lg", FOCUS_RING, variant === "dark" && "focus-visible:ring-offset-rzp-navy")}
+      aria-label="AgentGate home"
+    >
+      {mark}
+      <span className={cn("font-display text-base font-bold tracking-tight", variant === "dark" ? "text-white" : "text-rzp-text")}>AgentGate</span>
+    </Link>
+  );
+}
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { api, type StatsResponse } from "@/lib/demo/client";
+import { useT } from "@/lib/i18n/core";
+import { common } from "@/lib/i18n/strings/common";
+import { nav } from "@/lib/i18n/strings/nav";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
 /*  Navigation                                                         */
 /* ------------------------------------------------------------------ */
 
-export type ShellSection = "home" | "tower" | "onboard" | "simulator" | "evidence";
+export type ShellSection = "home" | "tower" | "onboard" | "simulator" | "evidence" | "developers";
 
 type IconProps = { className?: string };
 
@@ -64,40 +100,88 @@ function ShieldIcon({ className }: IconProps) {
   );
 }
 
+function CodeIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m8 8-4.5 4L8 16M16 8l4.5 4L16 16M13.5 5l-3 14" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+function MenuIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
+type CommonKey = keyof typeof common.en;
+
 interface NavItem {
   key: ShellSection;
   href: string;
-  label: string;
+  labelKey: CommonKey;
   Icon: (props: IconProps) => React.ReactElement;
 }
 
 interface NavGroup {
-  label: string;
+  labelKey: CommonKey;
   items: NavItem[];
 }
 
 const NAV: readonly NavGroup[] = [
   {
-    label: "Overview",
+    labelKey: "app.group.overview",
     items: [
-      { key: "home", href: "/", label: "Home", Icon: HomeIcon },
-      { key: "tower", href: "/dashboard", label: "Control Tower", Icon: TowerIcon },
+      { key: "home", href: "/", labelKey: "app.home", Icon: HomeIcon },
+      { key: "tower", href: "/dashboard", labelKey: "app.tower", Icon: TowerIcon },
     ],
   },
   {
-    label: "Sell",
+    labelKey: "app.group.sell",
     items: [
-      { key: "onboard", href: "/onboard", label: "Onboard", Icon: StoreIcon },
-      { key: "simulator", href: "/simulator", label: "Simulator", Icon: ChatIcon },
+      { key: "onboard", href: "/onboard", labelKey: "app.onboard", Icon: StoreIcon },
+      { key: "simulator", href: "/simulator", labelKey: "app.simulator", Icon: ChatIcon },
     ],
   },
   {
-    label: "Proof",
-    items: [{ key: "evidence", href: "/eval", label: "Evidence", Icon: ShieldIcon }],
+    labelKey: "app.group.proof",
+    items: [{ key: "evidence", href: "/eval", labelKey: "app.evidence", Icon: ShieldIcon }],
+  },
+  {
+    labelKey: "app.group.build",
+    items: [{ key: "developers", href: "/developers", labelKey: "app.developers", Icon: CodeIcon }],
   },
 ];
 
 const ALL_ITEMS: readonly NavItem[] = NAV.flatMap((g) => g.items);
+
+const DEFAULT_MERCHANT = "Ramesh Handlooms";
 
 function sectionForPath(pathname: string | null): ShellSection | null {
   if (!pathname) return null;
@@ -150,12 +234,73 @@ export function useStatsPoll(intervalMs = 10_000): ShellStats {
 
 const BAR_PILL = "inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium";
 
-export function TestModePill({ className }: { className?: string }) {
+export interface TestModePillProps {
+  className?: string;
+  /** "dark" sits on navy bars; "light" on white surfaces */
+  tone?: "dark" | "light";
+  /**
+   * Payment rail to name after the label: "razorpay" | "mock". Pass null while
+   * /api/stats is still loading (shows "Checking"); leave undefined for the
+   * plain "TEST MODE" pill.
+   */
+  payments?: StatsResponse["modes"]["payments"] | null;
+}
+
+/** "● TEST MODE · Razorpay" — the green dot pulses; the rail name follows /api/stats. */
+export function TestModePill({ className, tone = "dark", payments }: TestModePillProps) {
+  const t = useT(common);
+  const tn = useT(nav);
+  const rail = payments === undefined ? null : payments === null ? tn("pill.checking") : payments === "razorpay" ? tn("pill.razorpay") : tn("pill.mock");
+  const title = payments === undefined ? undefined : payments === "razorpay" ? tn("pill.title.razorpay") : payments === "mock" ? tn("pill.title.mock") : tn("pill.title.checking");
   return (
-    <span className={cn(BAR_PILL, "border-white/15 bg-white/10 text-white", className)}>
-      <span aria-hidden="true" className="h-2 w-2 rounded-full bg-rzp-green shadow-[0_0_0_3px_rgba(18,183,106,0.25)]" />
-      <span className="tracking-[0.12em]">TEST MODE</span>
+    <span
+      className={cn(BAR_PILL, tone === "dark" ? "border-white/15 bg-white/10 text-white" : "border-rzp-border bg-white text-rzp-navy shadow-sm", className)}
+      title={title}
+      data-payments={payments ?? undefined}
+    >
+      <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-rzp-green animate-dot-pulse" />
+      <span className="tracking-[0.12em]">{t("nav.testMode")}</span>
+      {rail ? (
+        <>
+          <span aria-hidden="true" className={tone === "dark" ? "text-white/40" : "text-rzp-muted"}>
+            ·
+          </span>
+          <span className={cn("tracking-normal", payments === null && "opacity-70")} aria-live="polite">
+            {rail}
+          </span>
+        </>
+      ) : null}
     </span>
+  );
+}
+
+export interface NotchTabProps {
+  /** colour of the bar the tab hangs from */
+  tone?: "light" | "dark";
+  className?: string;
+  children: React.ReactNode;
+}
+
+type NotchStyle = React.CSSProperties & { "--notch-bg"?: string };
+
+/**
+ * Downward tab cut from the bottom edge of a bar. Place inside a `relative`
+ * bar; it centres itself and overlaps the bar's border so the notch reads as
+ * one shape.
+ */
+export function NotchTab({ tone = "light", className, children }: NotchTabProps) {
+  const style: NotchStyle = { "--notch-bg": tone === "dark" ? "#0B1D3A" : "#FFFFFF" };
+  return (
+    <div
+      className={cn(
+        "notch-tab absolute left-1/2 top-[calc(100%-1px)] z-10 -translate-x-1/2 px-2.5 pb-2 pt-1",
+        tone === "light" && "shadow-[0_10px_22px_-10px_rgba(11,29,58,0.3)]",
+        className,
+      )}
+      style={style}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -179,20 +324,21 @@ function BarPill({ dot, children, title }: { dot: string; children: React.ReactN
 }
 
 function ModeBadgesView({ voice, modes, offline, className }: ModeBadgesProps) {
+  const t = useT(common);
   return (
-    <div className={cn("flex items-center gap-2", className)} aria-live="polite" aria-label="Runtime modes">
+    <div className={cn("flex items-center gap-2", className)} aria-live="polite" aria-label={t("shell.runtimeModes")}>
       {modes ? (
         <>
-          <BarPill dot={modes.llm === "openai" ? "bg-rzp-green" : "bg-rzp-amber"} title={modes.llm === "openai" ? "Seller agent runs on OpenAI GPT-4o" : "Seller agent runs the scripted fallback"}>
-            {modes.llm === "openai" ? "Seller · GPT-4o" : "Seller · Scripted"}
+          <BarPill dot={modes.llm === "openai" ? "bg-rzp-green" : "bg-rzp-amber"} title={modes.llm === "openai" ? t("shell.sellerGptTitle") : t("shell.sellerScriptedTitle")}>
+            {modes.llm === "openai" ? t("shell.sellerGpt") : t("shell.sellerScripted")}
           </BarPill>
-          <BarPill dot={modes.payments === "razorpay" ? "bg-rzp-blue" : "bg-rzp-amber"} title={modes.payments === "razorpay" ? "Payments on Razorpay test rails" : "Payments on the local mock adapter"}>
-            {modes.payments === "razorpay" ? "Payments · Razorpay test" : "Payments · Mock"}
+          <BarPill dot={modes.payments === "razorpay" ? "bg-rzp-cyan" : "bg-rzp-amber"} title={modes.payments === "razorpay" ? t("shell.paymentsRazorpayTitle") : t("shell.paymentsMockTitle")}>
+            {modes.payments === "razorpay" ? t("shell.paymentsRazorpay") : t("shell.paymentsMock")}
           </BarPill>
         </>
       ) : offline ? (
-        <BarPill dot="bg-rzp-red" title="Could not reach /api/stats">
-          Shop offline
+        <BarPill dot="bg-rzp-red" title={t("shell.shopOfflineTitle")}>
+          {t("shell.shopOffline")}
         </BarPill>
       ) : (
         <>
@@ -201,8 +347,8 @@ function ModeBadgesView({ voice, modes, offline, className }: ModeBadgesProps) {
         </>
       )}
       {typeof voice === "boolean" ? (
-        <BarPill dot={voice ? "bg-rzp-green" : "bg-white/40"} title={voice ? "Voice agent is listening" : "Voice agent is off"}>
-          {voice ? "Voice · on" : "Voice · off"}
+        <BarPill dot={voice ? "bg-rzp-green" : "bg-white/40"} title={voice ? t("voice.listening") : t("voice.idle")}>
+          {voice ? t("voice.on") : t("voice.off")}
         </BarPill>
       ) : null}
     </div>
@@ -229,15 +375,16 @@ export function initialsOf(name: string | null | undefined, fallback = "RH"): st
 }
 
 export function Avatar({ name, className }: { name?: string | null; className?: string }) {
-  const label = name?.trim() || "Ramesh Handlooms";
+  const t = useT(common);
+  const label = name?.trim() || DEFAULT_MERCHANT;
   return (
     <span
       className={cn(
-        "grid h-8 w-8 shrink-0 select-none place-items-center rounded-full bg-rzp-blue font-display text-xs font-bold text-white ring-2 ring-white/20",
+        "grid h-8 w-8 shrink-0 select-none place-items-center rounded-full bg-gradient-to-br from-rzp-blue to-rzp-teal font-display text-xs font-bold text-white ring-2 ring-white/20",
         className,
       )}
       role="img"
-      aria-label={`${label} — merchant account`}
+      aria-label={t("shell.merchantAccount", { name: label })}
       title={label}
     >
       {initialsOf(name)}
@@ -245,82 +392,299 @@ export function Avatar({ name, className }: { name?: string | null; className?: 
   );
 }
 
-function WordMark() {
-  return (
-    <Link
-      href="/"
-      className="flex shrink-0 items-center gap-2 rounded-md font-display text-lg font-bold tracking-tight text-white focus-visible:ring-offset-rzp-navy"
-      aria-label="AgentGate home"
-    >
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-        <rect x="2" y="2" width="20" height="20" rx="6" fill="#3395FF" />
-        <path d="M7 16.5 12 6l5 10.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M9.2 13h5.6" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      <span>AgentGate</span>
-    </Link>
-  );
-}
-
 /* ------------------------------------------------------------------ */
-/*  Sidebar + mobile row                                               */
+/*  Sidebar pieces                                                     */
 /* ------------------------------------------------------------------ */
 
-function NavLink({ item, active, compact }: { item: NavItem; active: boolean; compact: boolean }) {
+const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white";
+
+function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
+  const t = useT(common);
   return (
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      title={item.label}
+      onClick={onNavigate}
       className={cn(
-        "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
-        compact && "md:justify-center lg:justify-start",
-        active ? "bg-blue-50 text-blue-700" : "text-rzp-muted hover:bg-rzp-mist hover:text-rzp-text",
+        "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+        FOCUS_RING,
+        active ? "bg-rzp-ice text-rzp-blueDeep" : "text-rzp-muted hover:bg-rzp-mist hover:text-rzp-text",
       )}
     >
-      <item.Icon className={cn("h-5 w-5 shrink-0", active ? "text-blue-700" : "text-rzp-muted group-hover:text-rzp-text")} />
-      <span className={cn(compact && "md:sr-only lg:not-sr-only")}>{item.label}</span>
+      <span aria-hidden="true" className={cn("absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-rzp-blue transition-opacity", active ? "opacity-100" : "opacity-0")} />
+      <item.Icon className={cn("h-5 w-5 shrink-0", active ? "text-rzp-blue" : "text-rzp-muted group-hover:text-rzp-text")} />
+      <span>{t(item.labelKey)}</span>
     </Link>
   );
 }
 
-function Sidebar({ active }: { active: ShellSection | null }) {
+function NavGroups({ active, onNavigate }: { active: ShellSection | null; onNavigate?: () => void }) {
+  const t = useT(common);
   return (
-    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] shrink-0 border-r border-rzp-border bg-white md:block md:w-16 lg:w-64">
-      <nav aria-label="Primary" className="flex h-full flex-col gap-5 overflow-y-auto px-2 py-4 lg:px-3">
-        {NAV.map((group) => (
-          <div key={group.label}>
-            <p className="hidden px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-rzp-muted lg:block">{group.label}</p>
-            <ul className="space-y-0.5">
-              {group.items.map((item) => (
-                <li key={item.key}>
-                  <NavLink item={item} active={active === item.key} compact />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-        <div className="mt-auto hidden px-3 pb-2 lg:block">
-          <p className="font-display text-sm font-semibold text-rzp-text">Har paisa, likha hua.</p>
-          <p className="mt-1 text-xs text-rzp-muted">Razorpay Hackathon · Track 01</p>
+    <>
+      {NAV.map((group) => (
+        <div key={group.labelKey}>
+          <p className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">{t(group.labelKey)}</p>
+          <ul className="space-y-0.5">
+            {group.items.map((item) => (
+              <li key={item.key}>
+                <NavLink item={item} active={active === item.key} onNavigate={onNavigate} />
+              </li>
+            ))}
+          </ul>
         </div>
+      ))}
+    </>
+  );
+}
+
+function WorkspaceHeader({ merchant, onNavigate }: { merchant: string | null; onNavigate?: () => void }) {
+  const t = useT(common);
+  const tn = useT(nav);
+  const reduce = useReducedMotion();
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const id = React.useId();
+  const name = merchant ?? DEFAULT_MERCHANT;
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative border-b border-rzp-border p-2.5">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        aria-haspopup="true"
+        onClick={() => setOpen((o) => !o)}
+        className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-rzp-mist", FOCUS_RING)}
+      >
+        <Wordmark variant="mark" size={36} label={name} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-display text-sm font-bold leading-tight text-rzp-text">{name}</span>
+          <span className="block truncate text-xs text-rzp-muted">{t("shell.testWorkspace")}</span>
+        </span>
+        <ChevronIcon className={cn("h-4 w-4 shrink-0 text-rzp-muted transition-transform", open && "rotate-180")} />
+        <span className="sr-only">{t("shell.switchWorkspace")}</span>
+      </button>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            id={id}
+            role="group"
+            aria-label={t("shell.switchWorkspace")}
+            initial={{ opacity: 0, y: reduce ? 0 : -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reduce ? 0 : -6 }}
+            transition={{ duration: reduce ? 0 : 0.18, ease: "easeOut" }}
+            className="absolute inset-x-2.5 top-full z-30 mt-1 rounded-xl border border-rzp-border bg-white p-2 shadow-lift"
+          >
+            <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">{tn("workspace.current")}</p>
+            <div className="flex items-center gap-2 rounded-lg bg-rzp-ice px-2 py-1.5">
+              <Avatar name={name} className="h-7 w-7 text-[10px] ring-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-rzp-text">{name}</span>
+                <span className="block text-xs text-rzp-muted">{t("shell.testWorkspace")}</span>
+              </span>
+              <CheckIcon className="h-4 w-4 shrink-0 text-rzp-blue" />
+            </div>
+            <Link
+              href="/onboard"
+              onClick={() => {
+                setOpen(false);
+                onNavigate?.();
+              }}
+              className={cn("mt-1 block rounded-lg px-2 py-1.5 transition-colors hover:bg-rzp-mist", FOCUS_RING)}
+            >
+              <span className="block text-sm font-medium text-rzp-blueDeep">{tn("workspace.addShop")} →</span>
+              <span className="block text-xs text-rzp-muted">{tn("workspace.addShop.desc")}</span>
+            </Link>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function RailsCard({ stats, offline }: ShellStats) {
+  const t = useT(common);
+  const tn = useT(nav);
+  const payments = stats?.modes.payments ?? null;
+  const intact = stats?.stats.ledger_intact ?? null;
+  const count = stats?.stats.ledger_count ?? null;
+  const meter = stats?.eval ? Math.round(stats.eval.explained_pct) : intact === null ? null : intact ? 100 : 0;
+
+  return (
+    <div className="rounded-2xl border border-rzp-border bg-rzp-ice p-3">
+      <div className="flex items-center gap-2">
+        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-rzp-green animate-dot-pulse" />
+        <p className="truncate text-xs font-semibold text-rzp-text">{payments === "mock" ? tn("rails.mock") : t("shell.testRails")}</p>
+      </div>
+
+      <div className="mt-2.5">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-rzp-muted">
+          <span>{tn("rails.meter")}</span>
+          <span className="font-mono font-semibold text-rzp-text tnum">{meter === null ? "—" : `${meter}%`}</span>
+        </div>
+        <div
+          className="mt-1 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-rzp-border"
+          role="progressbar"
+          aria-label={tn("rails.meter")}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={meter ?? undefined}
+        >
+          <div
+            className={cn("h-full rounded-full transition-[width] duration-500 ease-out", meter !== null && meter < 100 ? "bg-rzp-amber" : "bg-gradient-to-r from-rzp-blue to-rzp-cyan")}
+            style={{ width: `${meter ?? 0}%` }}
+          />
+        </div>
+      </div>
+
+      <p className="mt-2 text-[11px] text-rzp-muted">
+        {count === null ? (
+          offline ? (
+            t("shell.shopOffline")
+          ) : (
+            tn("rails.waiting")
+          )
+        ) : (
+          <>
+            {tn("rails.ledger")} <span className="font-mono font-semibold text-rzp-text tnum">{count}</span>
+            {" · "}
+            <span className={intact ? "font-medium text-[#087443]" : "font-medium text-[#B3262C]"}>{intact ? tn("rails.chainOk") : tn("rails.chainBroken")}</span>
+          </>
+        )}
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <AgentVoiceToggle />
+        <LanguageToggle size="compact" />
+      </div>
+    </div>
+  );
+}
+
+function AvatarRow({ merchant }: { merchant: string | null }) {
+  const t = useT(common);
+  const name = merchant ?? DEFAULT_MERCHANT;
+  return (
+    <div className="mt-2 flex items-center gap-3 rounded-xl px-2 py-2">
+      <Avatar name={name} className="ring-rzp-border" />
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-rzp-text">{name}</p>
+        <p className="truncate text-xs text-rzp-muted">
+          {initialsOf(name)} · {t("shell.testWorkspace")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({ active, stats, offline }: { active: ShellSection | null } & ShellStats) {
+  const t = useT(common);
+  const merchant = stats?.merchant?.name ?? null;
+  return (
+    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-[264px] shrink-0 flex-col border-r border-rzp-border bg-white lg:flex">
+      <WorkspaceHeader merchant={merchant} />
+      <nav aria-label={t("shell.primaryNav")} className="scrollbar-thin flex-1 space-y-3 overflow-y-auto px-3 py-3">
+        <NavGroups active={active} />
       </nav>
+      <div className="border-t border-rzp-border px-3 pb-3 pt-3">
+        <RailsCard stats={stats} offline={offline} />
+        <AvatarRow merchant={merchant} />
+      </div>
     </aside>
   );
 }
 
-function MobileNav({ active }: { active: ShellSection | null }) {
+function MobileDrawer({ id, open, onClose, active, stats, offline }: { id: string; open: boolean; onClose: () => void; active: ShellSection | null } & ShellStats) {
+  const t = useT(common);
+  const tn = useT(nav);
+  const reduce = useReducedMotion();
+  const closeRef = React.useRef<HTMLButtonElement>(null);
+  const merchant = stats?.merchant?.name ?? null;
+
+  React.useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    closeRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
   return (
-    <nav aria-label="Primary" className="sticky top-14 z-30 border-b border-rzp-border bg-white md:hidden">
-      <ul className="scrollbar-thin flex gap-1 overflow-x-auto px-3 py-2">
-        {ALL_ITEMS.map((item) => (
-          <li key={item.key} className="shrink-0">
-            <NavLink item={item} active={active === item.key} compact={false} />
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <AnimatePresence>
+      {open ? (
+        <>
+          <motion.div
+            key="backdrop"
+            aria-hidden="true"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduce ? 0 : 0.2 }}
+            className="fixed inset-0 z-40 bg-rzp-navy/45 lg:hidden"
+          />
+          <motion.aside
+            key="panel"
+            id={id}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("shell.primaryNav")}
+            initial={{ x: reduce ? 0 : -24, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: reduce ? 0 : -24, opacity: 0 }}
+            transition={{ duration: reduce ? 0 : 0.22, ease: "easeOut" }}
+            className="fixed inset-y-0 left-0 z-50 flex w-[min(20rem,88vw)] flex-col bg-white shadow-lift lg:hidden"
+          >
+            <div className="flex h-14 items-center justify-between border-b border-rzp-border px-3">
+              <Wordmark variant="light" size={32} />
+              <button
+                ref={closeRef}
+                type="button"
+                onClick={onClose}
+                aria-label={tn("drawer.close")}
+                className={cn("inline-flex h-9 w-9 items-center justify-center rounded-lg text-rzp-muted hover:bg-rzp-mist hover:text-rzp-text", FOCUS_RING)}
+              >
+                <CloseIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <WorkspaceHeader merchant={merchant} onNavigate={onClose} />
+            <nav aria-label={t("shell.primaryNav")} className="scrollbar-thin flex-1 space-y-3 overflow-y-auto px-3 py-3">
+              <NavGroups active={active} onNavigate={onClose} />
+            </nav>
+            <div className="border-t border-rzp-border px-3 pb-3 pt-3">
+              <RailsCard stats={stats} offline={offline} />
+              <AvatarRow merchant={merchant} />
+            </div>
+          </motion.aside>
+        </>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -353,40 +717,65 @@ const WIDTH: Record<NonNullable<AppShellProps["width"]>, string> = {
 };
 
 /**
- * Dashboard-style chrome: navy top bar (wordmark · TEST MODE · mode pills · avatar),
- * white sidebar (icon rail under lg, horizontal row under md), page header and a
- * mist content area. Children render inside a <main>, so pages should not add their own.
+ * Product chrome: navy top bar (brand · centre notch with the live TEST MODE
+ * pill · mode pills · avatar), a white sidebar with the workspace header,
+ * grouped navigation and the rails card (voice + language), a page header and
+ * a mist content area. Under lg the sidebar becomes a drawer behind the menu
+ * button. Children render inside a <main>, so pages should not add their own.
  */
 export function AppShell({ title, subtitle, actions, headerExtra, children, section, voice, width = "default", contentClassName }: AppShellProps) {
   const pathname = usePathname();
   const active = section ?? sectionForPath(pathname);
   const { stats, offline } = useStatsPoll(10_000);
   const merchantName = stats?.merchant?.name ?? null;
+  const payments = stats?.modes.payments ?? null;
   const widthClass = WIDTH[width];
+  const tn = useT(nav);
+  const drawerId = React.useId();
+  const [drawer, setDrawer] = React.useState(false);
+  const closeDrawer = React.useCallback(() => setDrawer(false), []);
+
+  React.useEffect(() => {
+    setDrawer(false);
+  }, [pathname]);
 
   return (
     <div className="flex min-h-screen flex-col bg-rzp-mist text-rzp-text">
       <header className="sticky top-0 z-40 h-14 bg-rzp-navy text-white">
-        <div className="relative flex h-full items-center justify-between gap-3 px-4 sm:px-6">
-          <WordMark />
-          <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">
-            <TestModePill />
-          </div>
+        <div className="relative flex h-full items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex items-center gap-2">
-            <TestModePill className="sm:hidden" />
+            <button
+              type="button"
+              onClick={() => setDrawer((o) => !o)}
+              aria-expanded={drawer}
+              aria-controls={drawerId}
+              aria-label={drawer ? tn("drawer.close") : tn("drawer.open")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/85 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-rzp-navy lg:hidden"
+            >
+              {drawer ? <CloseIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
+            </button>
+            <Wordmark variant="dark" size={32} />
+          </div>
+
+          <NotchTab tone="dark" className="hidden sm:block">
+            <TestModePill payments={payments} />
+          </NotchTab>
+
+          <div className="flex items-center gap-2">
+            <TestModePill payments={payments} className="sm:hidden" />
             <ModeBadges voice={voice} modes={stats?.modes ?? null} offline={offline} className="hidden md:flex" />
             <Avatar name={merchantName} />
           </div>
         </div>
       </header>
 
-      <MobileNav active={active} />
+      <MobileDrawer id={drawerId} open={drawer} onClose={closeDrawer} active={active} stats={stats} offline={offline} />
 
       <div className="flex flex-1">
-        <Sidebar active={active} />
+        <Sidebar active={active} stats={stats} offline={offline} />
 
         <div className="min-w-0 flex-1">
-          <div className={cn("mx-auto w-full px-4 pb-4 pt-6 sm:px-6 lg:px-8", widthClass)}>
+          <div className={cn("mx-auto w-full px-4 pb-4 pt-8 sm:px-6 sm:pt-10 lg:px-8", widthClass)}>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="min-w-0">
                 <h1 className="font-display text-2xl font-bold tracking-tight text-rzp-text sm:text-3xl">{title}</h1>

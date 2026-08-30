@@ -2,14 +2,16 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Pill badge tones. Current: blue · green · amber · red · violet · gray.
+ * Pill badge tones. Current: blue · green · amber · red · violet · teal · saffron · gray.
  * Legacy tones (ink · money · turmeric · deny · action) map onto the same pills.
  * Text colours are darkened past the brand swatches so every tone clears 4.5:1 on white.
  */
-export type BadgeTone = "blue" | "green" | "amber" | "red" | "violet" | "gray" | "ink" | "money" | "turmeric" | "deny" | "action";
+export type BadgeTone = "blue" | "green" | "amber" | "red" | "violet" | "teal" | "saffron" | "gray" | "ink" | "money" | "turmeric" | "deny" | "action";
 
 const TONE: Record<BadgeTone, { pill: string; dot: string }> = {
   blue: { pill: "border-rzp-blue/25 bg-rzp-blue/10 text-rzp-blueDeep", dot: "bg-rzp-blue" },
+  teal: { pill: "border-rzp-teal/35 bg-rzp-teal/10 text-[#0B6B84]", dot: "bg-rzp-teal" },
+  saffron: { pill: "border-rzp-saffron/40 bg-rzp-saffron/10 text-[#A03E00]", dot: "bg-rzp-saffron" },
   green: { pill: "border-rzp-green/30 bg-rzp-green/10 text-[#087443]", dot: "bg-rzp-green" },
   amber: { pill: "border-rzp-amber/40 bg-rzp-amber/10 text-[#9A4F00]", dot: "bg-rzp-amber" },
   red: { pill: "border-rzp-red/30 bg-rzp-red/10 text-[#B3262C]", dot: "bg-rzp-red" },
