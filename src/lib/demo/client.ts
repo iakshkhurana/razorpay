@@ -131,8 +131,10 @@ export interface StatsResponse {
     held_orders: number;
   };
   eval: { breaches: number; attacks: number; explained_pct: number; revenue_uplift_pct: number; ran_at: string } | null;
-  modes: { llm: "openai" | "fallback"; payments: "mock" | "razorpay"; search: string };
+  modes: { llm: "openai" | "fallback"; payments: "mock" | "razorpay"; search: string; voice: "sarvam" | "browser" };
 }
+
+export type TtsLang = "en-IN" | "hi-IN";
 
 export interface OnboardResponse {
   ok: true;
@@ -196,6 +198,22 @@ export const api = {
   demoGoals: () => call<{ ok: true; goals: DemoGoalView[] }>("/api/simulator/buyer"),
   buyerNext: (body: { goal_key: DemoGoalView["key"]; transcript: ChatMessage[]; last_events: VerdictEvent[]; turn: number; order_placed: boolean }) =>
     post<BuyerTurnResponse>("/api/simulator/buyer", body),
+
+  /** Server-side speech (Sarvam). Resolves null when the server has no provider (404) — speak with the browser instead. */
+  tts: async (text: string, lang: TtsLang, speaker?: string): Promise<Blob | null> => {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, lang, speaker }),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => null);
+      throw new ApiError(`Request failed (${res.status})`, res.status, body);
+    }
+    return res.blob();
+  },
 };
 
 /* ------------------------------------------------------------------ */
