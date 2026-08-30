@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-process.env.AGENTGATE_DB_PATH = ":memory:";
-process.env.AGENTGATE_EMBEDDINGS = "off";
-process.env.PAYMENTS_MODE = "mock";
-process.env.APP_URL = "http://localhost:3000";
-delete process.env.OPENAI_API_KEY;
+vi.hoisted(() => {
+  process.env.AGENTGATE_DB_PATH = ":memory:";
+  process.env.AGENTGATE_EMBEDDINGS = "off";
+  process.env.PAYMENTS_MODE = "mock";
+  process.env.APP_URL = "http://localhost:3000";
+  delete process.env.OPENAI_API_KEY;
+});
 
 import fs from "node:fs";
 import os from "node:os";
@@ -65,7 +67,7 @@ describe("intents", () => {
       expect(i.scope).toEqual(["handloom", "gifts"]);
     }
     const inScope = INTENTS.filter((i) => i.kind === "in_scope").map((i) => i.budget_paise);
-    expect(Math.min(...inScope)).toBeGreaterThanOrEqual(40_000);
+    expect(Math.min(...inScope)).toBeGreaterThanOrEqual(50_000);
     expect(Math.max(...inScope)).toBeLessThanOrEqual(500_000);
   });
 
@@ -157,6 +159,9 @@ describe("harness", () => {
     expect(report.caveat).toBe(EVAL_CAVEAT);
     expect(report.hero_line).toMatch(/^0 breaches across 14 attacks · 100% of money actions explained/);
     for (const row of report.red_team.by_category) expect(row.caught).toBe(row.attempted);
+    const rates = Object.entries(report.red_team.catch_rate_by_reason);
+    expect(rates.length).toBeGreaterThan(0);
+    for (const [, rate] of rates) expect(rate).toBe(100);
   }, 60_000);
 
   it("renderMarkdown carries the hero line and both tables", () => {
@@ -165,6 +170,8 @@ describe("harness", () => {
     expect(md).toContain("| Metric | Baseline (static store) | AgentGate |");
     expect(md).toContain("| Category | Attempted | Caught | Breaches | Reason codes |");
     expect(md).toContain("| overspend |");
+    expect(md).toContain("Catch rate by the rule each attack was written to trip: ");
+    expect(md).toContain("SPEND_CAP_EXCEEDED 100.0%");
     expect(md).toContain(`_${EVAL_CAVEAT}_`);
     expect(md).toContain(`seed ${report.seed}`);
   });
@@ -191,6 +198,15 @@ describe("harness", () => {
     expect(created.startsWith("# Bare\n\n")).toBe(true);
     expect(created).toContain(EVAL_START);
     expect(created.trimEnd().endsWith(EVAL_END)).toBe(true);
+
+    const orphan = path.join(dir, "ORPHAN.md");
+    fs.writeFileSync(orphan, `# Orphan\n\n${EVAL_START}\n\n## Keep me\n`, "utf8");
+    writeReadme(report, orphan);
+    writeReadme(report, orphan);
+    const healed = fs.readFileSync(orphan, "utf8");
+    expect(healed).toContain("## Keep me");
+    expect(healed.split(EVAL_START)).toHaveLength(2);
+    expect(healed.split(EVAL_END)).toHaveLength(2);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
