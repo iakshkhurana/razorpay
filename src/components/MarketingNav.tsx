@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
-import { NotchTab, TestModePill, useStatsPoll } from "@/components/AppShell";
+import { TestModePill, useStatsPoll } from "@/components/AppShell";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ChatVerdict, LedgerStamp, ShieldCheck, Storefront, type IllustrationProps } from "@/components/illustrations";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -476,7 +476,7 @@ export function MarketingNav({ className }: MarketingNavProps) {
       ref={headerRef}
       className={cn(
         "sticky top-0 z-40 h-16 border-b transition-[background-color,border-color,box-shadow] duration-200",
-        frosted ? "border-rzp-border bg-white/85 shadow-[0_4px_20px_rgba(20,33,61,0.06)] backdrop-blur-md" : "border-transparent bg-white/95",
+        frosted ? "border-rzp-border bg-white/85 shadow-[0_4px_20px_rgba(20,33,61,0.06)] backdrop-blur-md" : "border-transparent bg-transparent",
         className,
       )}
     >
@@ -513,11 +513,9 @@ export function MarketingNav({ className }: MarketingNavProps) {
           </nav>
         </div>
 
-        {/* centre: the notch tab with the live pill */}
-        <div className="relative hidden h-full lg:block">
-          <NotchTab tone="light">
-            <TestModePill tone="light" payments={payments} className="border-transparent shadow-none" />
-          </NotchTab>
+        {/* centre: the live pill, inline in the bar */}
+        <div className="hidden h-full items-center justify-center lg:flex">
+          <TestModePill tone="light" payments={payments} />
         </div>
 
         {/* right: language + CTA + menu button */}
