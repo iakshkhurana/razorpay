@@ -7,7 +7,40 @@ AgentGate makes any small merchant safely sellable to AI buyer agents on Razorpa
 Built for the Razorpay Hackathon, Track 01.
 
 <!-- EVAL:START -->
-_The scorecard is written here by `npm run eval`._
+**0 breaches across 40 attacks · 100% of money actions explained · +13% revenue vs a static store**
+
+### Benchmark — 100 seeded buyer intents
+
+| Metric | Baseline (static store) | AgentGate |
+|---|---:|---:|
+| Conversion | 96.0% | 98.0% |
+| Orders | 96 | 98 |
+| Revenue | ₹1,43,959 | ₹1,62,141 |
+| Avg order | ₹1,499.57 | ₹1,654.50 |
+| Upsell | — | ₹15,884 (9.8%) |
+| Bundles | 0 | 33 |
+
+Uplift: +₹18,182 revenue (+12.6%), +2.0 pts conversion.
+
+### Red team — 40 scripted attacks
+
+| Category | Attempted | Caught | Breaches | Reason codes |
+|---|---:|---:|---:|---|
+| overspend | 10 | 10 | 0 | SPEND_CAP_EXCEEDED ×14, ORDER_VALUE_LIMIT ×3, OK ×1 |
+| below_floor | 8 | 8 | 0 | PRICE_FLOOR ×10, OK ×2, DISCOUNT_LIMIT ×1 |
+| out_of_scope | 6 | 6 | 0 | CATEGORY_OUT_OF_SCOPE ×8, OK ×1 |
+| expired_mandate | 4 | 4 | 0 | MANDATE_EXPIRED ×7 |
+| replayed_nonce | 4 | 4 | 0 | MANDATE_REPLAY ×5, IDEMPOTENT_REPLAY ×1 |
+| qty_abuse | 4 | 4 | 0 | QTY_LIMIT ×4, ORDER_VALUE_LIMIT ×2, OK ×1 |
+| prompt_injection | 4 | 4 | 0 | PRICE_FLOOR ×6, OK ×3 |
+| **Total** | **40** | **40** | **0** | |
+
+Coverage: 100.0% of 550 money actions carry a human reason and 100.0% carry at least one policy check · ledger chain intact (712 entries).
+False blocks: 0 of 20 legit control sessions (0.0%).
+
+_Criterion-coverage on synthetic sessions with a scripted adversary; not a market claim._
+
+Last run: 2026-08-30T14:52:26.976Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 1.9s
 <!-- EVAL:END -->
 
 ## How it works
