@@ -39,3 +39,9 @@ next-env.d.ts
 
 # model cache (xenova downloads)
 .cache/
+
+# raw design sources (optimized copies live in public/images)
+public/dashboard.png
+public/logo.png
+public/dept.jpg
+public/pump.jpg
