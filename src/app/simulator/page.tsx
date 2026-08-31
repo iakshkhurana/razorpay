@@ -242,9 +242,9 @@ export default function SimulatorPage() {
     [nextId],
   );
   const addSeller = useCallback(
-    (text: string, events: VerdictEvent[], offer: ChatOffer | null) => {
+    (text: string, events: VerdictEvent[], offer: ChatOffer | null, citations: Array<{ source: string; text: string }> = []) => {
       if (offer) lastOfferRef.current = offer;
-      setItems((prev) => [...prev, { id: nextId("s"), kind: "seller", text, events, offer }]);
+      setItems((prev) => [...prev, { id: nextId("s"), kind: "seller", text, events, offer, citations }]);
       sayAsSeller(text);
     },
     [nextId, sayAsSeller],
@@ -405,7 +405,7 @@ export default function SimulatorPage() {
         const offer: ChatOffer | null = res.offer
           ? { id: res.offer.id, total_paise: res.offer.total_paise, decision: res.offer.verdict.decision, is_bundle: res.offer.is_bundle }
           : null;
-        addSeller(res.reply, res.events, offer);
+        addSeller(res.reply, res.events, offer, res.citations ?? []);
         for (const ev of res.events) {
           if (ev.action === "checkout" && ev.offer_id) resolveOffer(ev.offer_id);
         }

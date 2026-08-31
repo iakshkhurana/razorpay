@@ -82,6 +82,8 @@ export interface NegotiateResponse {
   mode: "openai" | "fallback";
   upsell_done: boolean;
   injection_signals: string[];
+  /** sources behind a shop-info answer (rulebook/catalog); empty for money turns */
+  citations: Array<{ source: string; text: string }>;
 }
 
 export interface CheckoutResponse {

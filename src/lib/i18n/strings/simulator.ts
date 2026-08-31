@@ -36,6 +36,7 @@ export const simulator = dict({
     "chat.verdicts": "Policy verdicts",
     "chat.counter": "Counter",
     "chat.accept": "Accept offer",
+    "chat.source": "Source",
 
     /* order card */
     "order.aria": "Order {{id}}, {{amount}}, {{stamp}}",
@@ -153,6 +154,7 @@ export const simulator = dict({
     "chat.verdicts": "नीति के फ़ैसले",
     "chat.counter": "जवाबी ऑफ़र",
     "chat.accept": "ऑफ़र स्वीकार करें",
+    "chat.source": "स्रोत",
 
     "order.aria": "ऑर्डर {{id}}, {{amount}}, {{stamp}}",
     "order.id": "ऑर्डर {{id}}",

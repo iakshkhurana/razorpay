@@ -34,5 +34,6 @@ export async function POST(req: Request) {
     mode: result.mode,
     upsell_done: result.session.upsell_done,
     injection_signals: result.injection_signals,
+    citations: result.citations,
   });
 }
