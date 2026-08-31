@@ -1,4 +1,5 @@
 import { error, json } from "@/lib/api";
+import { recordVoiceCall } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
   body.append("model", STT_MODEL);
   body.append("language_code", language_code);
 
+  const started = Date.now();
   try {
     const res = await fetch(SARVAM_URL, {
       method: "POST",
@@ -67,6 +69,7 @@ export async function POST(req: Request) {
     }
     const data = (await res.json()) as { transcript?: unknown; language_code?: unknown };
     const transcript = typeof data.transcript === "string" ? data.transcript.trim() : "";
+    recordVoiceCall("stt", Date.now() - started, true, transcript.length);
     return json({
       ok: true,
       transcript,

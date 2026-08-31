@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { z } from "zod";
+import { recordLlmCall } from "../metrics";
 
 /**
  * Single entry point for every model call in the product.
@@ -106,8 +107,15 @@ async function complete(
   timeoutMs: number,
 ): Promise<OpenAI.ChatCompletionMessage | null> {
   if (llmMode() !== "openai") return null;
+  const started = Date.now();
   try {
     const res = await getOpenAI().chat.completions.create(params, { timeout: timeoutMs });
+    recordLlmCall({
+      model: params.model,
+      duration_ms: Date.now() - started,
+      prompt_tokens: res.usage?.prompt_tokens ?? 0,
+      completion_tokens: res.usage?.completion_tokens ?? 0,
+    });
     return res.choices[0]?.message ?? null;
   } catch (err) {
     tripBreaker(err);

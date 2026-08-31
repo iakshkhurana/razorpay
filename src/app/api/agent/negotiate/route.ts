@@ -1,5 +1,6 @@
 import { json, parseBody, requireMandate } from "@/lib/api";
 import { loadSession, sellerTurn } from "@/lib/llm/seller";
+import { beginTurn, endTurn } from "@/lib/metrics";
 import { NegotiateRequestSchema } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,15 @@ export async function POST(req: Request) {
   if (!mandate.ok) return mandate.response;
 
   const session = loadSession(body.data.session_id, mandate.claims.mandate_id);
-  const result = await sellerTurn({ session, mandate: mandate.claims, message: body.data.message, now: mandate.now, lang: body.data.lang });
+  beginTurn("negotiate", body.data.lang);
+  let result;
+  try {
+    result = await sellerTurn({ session, mandate: mandate.claims, message: body.data.message, now: mandate.now, lang: body.data.lang });
+  } catch (err) {
+    endTurn({ ok: false });
+    throw err;
+  }
+  endTurn({ mode: result.mode });
 
   return json({
     ok: true,

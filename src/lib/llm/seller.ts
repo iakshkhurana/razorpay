@@ -2,6 +2,7 @@ import type OpenAI from "openai";
 import { z } from "zod";
 import { getOffer, getSession, listSkus, saveSession } from "../db";
 import { newId } from "../ids";
+import { recordToolCall } from "../metrics";
 import { formatINR } from "../money";
 import {
   type ChatMessage,
@@ -581,7 +582,9 @@ async function llmTurn(input: SellerTurnInput): Promise<SellerTurnResult | null>
     }
     for (const call of calls) {
       if (call.type !== "function") continue;
+      const toolStarted = Date.now();
       const result = await runTool(call.function.name, call.function.arguments, input, session, events, sink);
+      recordToolCall(call.function.name, Date.now() - toolStarted);
       history.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
     }
   }

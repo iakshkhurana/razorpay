@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 /*  Navigation                                                         */
 /* ------------------------------------------------------------------ */
 
-export type ShellSection = "home" | "tower" | "onboard" | "simulator" | "evidence" | "developers";
+export type ShellSection = "home" | "tower" | "onboard" | "simulator" | "evidence" | "developers" | "metrics";
 
 type IconProps = { className?: string };
 
@@ -145,9 +145,20 @@ const NAV: readonly NavGroup[] = [
   },
   {
     labelKey: "app.group.build",
-    items: [{ key: "developers", href: "/developers", labelKey: "app.developers", Icon: CodeIcon }],
+    items: [
+      { key: "developers", href: "/developers", labelKey: "app.developers", Icon: CodeIcon },
+      { key: "metrics", href: "/metrics", labelKey: "app.metrics", Icon: PulseIcon },
+    ],
   },
 ];
+
+function PulseIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12h4l2.5-6 4 12 2.5-6h5" />
+    </svg>
+  );
+}
 
 const ALL_ITEMS: readonly NavItem[] = NAV.flatMap((g) => g.items);
 

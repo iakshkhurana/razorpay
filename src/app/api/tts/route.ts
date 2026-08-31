@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { json, parseBody } from "@/lib/api";
+import { recordVoiceCall } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
     speech_sample_rate: 22050,
   };
 
+  const started = Date.now();
   try {
     const signal = AbortSignal.timeout(UPSTREAM_TIMEOUT_MS);
     let res = await callSarvam(key, { text, ...settings }, signal);
@@ -80,6 +82,7 @@ export async function POST(req: Request) {
     const bytes = Buffer.from(audio, "base64");
     if (!bytes.length) return browserFallback();
 
+    recordVoiceCall("tts", Date.now() - started, true, text.length);
     return new Response(new Uint8Array(bytes), {
       status: 200,
       headers: { "content-type": "audio/wav", "cache-control": "no-store", "content-length": String(bytes.length) },
