@@ -19,6 +19,8 @@ import {
   type NegotiateResponse,
   type StatsResponse,
 } from "@/lib/demo/client";
+import { useLocale, useT, type Translator } from "@/lib/i18n/core";
+import { simulator, type SimulatorKey } from "@/lib/i18n/strings/simulator";
 import { formatINR, rupeesToPaise } from "@/lib/money";
 import type { ChatMessage, VerdictEvent } from "@/lib/schemas";
 import { isTourActive, useTourAction, type TourEventDetail } from "@/lib/tour/client";
@@ -40,7 +42,6 @@ const WEBHOOK_DELAY_MS = 1500;
 
 const ACCEPT_LINE = "Yes, that works — I'll take it.";
 const OVERSPEND_LINE = "I want the Banarasi silk saree";
-const OFFLINE_LINE = "The shop did not respond. Check that the app is running.";
 
 /** Used by the tour when the goals request has not returned. Mirrors the server's gift goal. */
 const FALLBACK_GIFT_GOAL: DemoGoalView = {
@@ -51,11 +52,11 @@ const FALLBACK_GIFT_GOAL: DemoGoalView = {
   scope: DEFAULT_SCOPE,
 };
 
-/** Illustration + one-line story for each demo goal the server offers. */
-const GOAL_ART: Record<DemoGoalView["key"], { Art: ComponentType<IllustrationProps>; blurb: string }> = {
-  gift: { Art: RupeeCoin, blurb: "Cotton saree plus a matching blouse. ALLOW, then PAID." },
-  wedding: { Art: ShieldCheck, blurb: "Juttis out of scope, two Banarasis over the cap. DENY, COUNTER, then the owner's call." },
-  failure: { Art: FloatingCard, blurb: "The bank fails the payment. HELD, backup link, then PAID." },
+/** Illustration for each demo goal; the label and blurb come from the dictionary. */
+const GOAL_ART: Record<DemoGoalView["key"], ComponentType<IllustrationProps>> = {
+  gift: RupeeCoin,
+  wedding: ShieldCheck,
+  failure: FloatingCard,
 };
 
 interface ActiveMandate {
@@ -67,9 +68,9 @@ interface ActiveMandate {
 
 type CapChoice = (typeof CAP_PRESETS)[number] | "custom";
 
-function describeError(err: unknown): string {
+function describeError(err: unknown, offline: string): string {
   if (err instanceof ApiError && err.status < 500) return err.message;
-  return OFFLINE_LINE;
+  return offline;
 }
 
 function mmss(totalSeconds: number): string {
@@ -104,7 +105,7 @@ function supersedes(next: OrderCard, current: OrderCard): boolean {
 }
 
 /** Owns its own 1s tick so the countdown never re-renders the conversation. */
-function ExpiryCountdown({ mandate, onExpire }: { mandate: ActiveMandate; onExpire: () => void }) {
+function ExpiryCountdown({ mandate, onExpire, expiredLabel }: { mandate: ActiveMandate; onExpire: () => void; expiredLabel: string }) {
   const [left, setLeft] = useState(() => secondsLeftOf(mandate, Date.now()));
   useEffect(() => {
     const tick = () => {
@@ -119,16 +120,16 @@ function ExpiryCountdown({ mandate, onExpire }: { mandate: ActiveMandate; onExpi
     tick();
     return () => window.clearInterval(t);
   }, [mandate, onExpire]);
-  return <dd className={cn("font-mono tnum", left === 0 ? "text-[#B3262C]" : "text-rzp-text")}>{left === 0 ? "expired" : mmss(left)}</dd>;
+  return <dd className={cn("font-mono tnum", left === 0 ? "text-[#B3262C]" : "text-rzp-text")}>{left === 0 ? expiredLabel : mmss(left)}</dd>;
 }
 
-function checkoutReply(res: CheckoutResponse): string {
+function checkoutReply(res: CheckoutResponse, t: Translator<SimulatorKey>): string {
   if (!res.order) return res.verdict.human_reason;
   const amount = formatINR(res.order.amount_paise);
-  const names = res.order.sku_names.length > 0 ? res.order.sku_names.join(" + ") : "your order";
-  if (res.duplicate) return `This offer was already checked out — here is the same order for ${amount}.`;
-  if (res.order.status === "PENDING_APPROVAL") return `Thank you — ${names} for ${amount} is noted. The shop owner will confirm this one shortly.`;
-  return `Done — ${names} for ${amount}. Your payment link is ready; the order is confirmed the moment the bank says yes.`;
+  const names = res.order.sku_names.length > 0 ? res.order.sku_names.join(" + ") : t("reply.yourOrder");
+  if (res.duplicate) return t("reply.duplicate", { amount });
+  if (res.order.status === "PENDING_APPROVAL") return t("reply.pending", { names, amount });
+  return t("reply.done", { names, amount });
 }
 
 function ArrowIcon({ className }: { className?: string }) {
@@ -153,6 +154,14 @@ function SendIcon({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 export default function SimulatorPage() {
+  const t = useT(simulator);
+  const { locale } = useLocale();
+  /** stable handles for callbacks that outlive a render */
+  const tRef = useRef(t);
+  tRef.current = t;
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
+
   const [items, setItems] = useState<ChatItem[]>([]);
   const [mandate, setMandate] = useState<ActiveMandate | null>(null);
   const [goals, setGoals] = useState<DemoGoalView[]>([]);
@@ -202,7 +211,7 @@ export default function SimulatorPage() {
     if (!v.enabled) return;
     const seq = ++speakSeqRef.current;
     setSpeaking(true);
-    v.speak(text, "en-IN").finally(() => {
+    v.speak(text).finally(() => {
       if (seq === speakSeqRef.current) setSpeaking(false);
     });
   }, []);
@@ -303,7 +312,7 @@ export default function SimulatorPage() {
           }
         } catch {
           failures += 1;
-          if (failures >= 3) setPollError("Could not refresh the order. Check that the app is running.");
+          if (failures >= 3) setPollError(tRef.current("note.pollFailed"));
         } finally {
           inFlight = false;
         }
@@ -345,10 +354,10 @@ export default function SimulatorPage() {
         setMandate(active);
         setExpired(false);
         sessionRef.current = undefined;
-        addNote(`Mandate issued — ${formatINR(res.mandate.spend_cap_paise)} on ${res.mandate.scope}. The buyer may shop.`);
+        addNote(tRef.current("note.mandateIssued", { cap: formatINR(res.mandate.spend_cap_paise), scope: res.mandate.scope }));
         return active;
       } catch (err) {
-        if (gen === genRef.current) addNote(describeError(err), "deny");
+        if (gen === genRef.current) addNote(describeError(err, tRef.current("note.offline")), "deny");
         return null;
       } finally {
         if (gen === genRef.current) setIssuing(false);
@@ -364,7 +373,7 @@ export default function SimulatorPage() {
     if (capChoice === "custom") {
       const rupees = Number(customCap.replace(/[^\d.]/g, ""));
       if (!Number.isFinite(rupees) || rupees <= 0) {
-        setCapError("Enter a cap in rupees, like 3500.");
+        setCapError(t("mandate.capError"));
         return;
       }
       cap_paise = rupeesToPaise(rupees);
@@ -388,7 +397,7 @@ export default function SimulatorPage() {
       addBuyer(message);
       setBusy(true);
       try {
-        const res = await api.negotiate({ mandate_token: token, message, session_id: sessionRef.current });
+        const res = await api.negotiate({ mandate_token: token, message, session_id: sessionRef.current, lang: localeRef.current });
         if (gen !== genRef.current) return null;
         sessionRef.current = res.session_id;
         setSellerMode(res.mode);
@@ -405,7 +414,7 @@ export default function SimulatorPage() {
         }
         return res;
       } catch (err) {
-        if (gen === genRef.current) addNote(describeError(err), "deny");
+        if (gen === genRef.current) addNote(describeError(err, tRef.current("note.offline")), "deny");
         return null;
       } finally {
         if (gen === genRef.current) setBusy(false);
@@ -431,7 +440,7 @@ export default function SimulatorPage() {
           offer_id: offer.id,
           ledger_entry_id: res.ledger_entry_id,
         };
-        addSeller(checkoutReply(res), [event], null);
+        addSeller(checkoutReply(res, tRef.current), [event], null);
         if (res.order) {
           addOrder(toOrderCard(res.order));
           startPolling(res.order.id);
@@ -439,7 +448,7 @@ export default function SimulatorPage() {
         }
         return null;
       } catch (err) {
-        if (gen === genRef.current) addNote(describeError(err), "deny");
+        if (gen === genRef.current) addNote(describeError(err, tRef.current("note.offline")), "deny");
         return null;
       } finally {
         if (gen === genRef.current) setBusy(false);
@@ -459,7 +468,7 @@ export default function SimulatorPage() {
           void celebrate(orderId);
         }
       } catch (err) {
-        if (gen === genRef.current) addNote(describeError(err), "deny");
+        if (gen === genRef.current) addNote(describeError(err, tRef.current("note.offline")), "deny");
       }
     },
     [addNote, celebrate, stopPolling, updateOrder],
@@ -496,9 +505,9 @@ export default function SimulatorPage() {
         for (let turn = 0; turn < MAX_BUYER_TURNS; turn += 1) {
           let next;
           try {
-            next = await api.buyerNext({ goal_key: goal.key, transcript, last_events: lastEvents, turn, order_placed: orderPlaced });
+            next = await api.buyerNext({ goal_key: goal.key, transcript, last_events: lastEvents, turn, order_placed: orderPlaced, lang: localeRef.current });
           } catch (err) {
-            if (gen === genRef.current) addNote(describeError(err), "deny");
+            if (gen === genRef.current) addNote(describeError(err, tRef.current("note.offline")), "deny");
             return;
           }
           if (gen !== genRef.current) return;
@@ -519,7 +528,7 @@ export default function SimulatorPage() {
             if (goal.key === "failure" && res.order.status === "AWAITING_PAYMENT") {
               await sleep(WEBHOOK_DELAY_MS);
               if (gen !== genRef.current) return;
-              addNote("Simulating a bank failure on the test rails…", "turmeric");
+              addNote(tRef.current("note.bankFailure"), "turmeric");
               await simulateBank(res.order.id, "failure", gen);
             }
             break;
@@ -548,7 +557,7 @@ export default function SimulatorPage() {
     if (!text || running) return;
     const active = mandateRef.current;
     if (!active) {
-      addNote("Issue a mandate first — the buyer needs one before it can talk to the shop.", "deny");
+      addNote(t("note.issueFirst"), "deny");
       return;
     }
     setDraft("");
@@ -682,7 +691,7 @@ export default function SimulatorPage() {
         setGoals(res.goals);
         setGoalsError(null);
       })
-      .catch(() => setGoalsError("Could not load the demo goals. Check that the app is running."));
+      .catch(() => setGoalsError(tRef.current("goals.error")));
 
     api
       .stats()
@@ -718,8 +727,8 @@ export default function SimulatorPage() {
   return (
     <AppShell
       section="simulator"
-      title="Buyer simulator"
-      subtitle="Talk to the seller as an AI buyer. Every price arrives with a verdict."
+      title={t("page.title")}
+      subtitle={t("page.subtitle")}
       actions={<AgentVoiceToggle />}
       voice={voicePill}
     >
@@ -746,41 +755,41 @@ export default function SimulatorPage() {
         </div>
 
         {/* RIGHT: the rail */}
-        <aside className="fade-up space-y-4" style={{ "--delay": "120ms" } as CSSProperties} aria-label="Mandate and controls">
+        <aside className="fade-up space-y-4" style={{ "--delay": "120ms" } as CSSProperties} aria-label={t("mandate.rail")}>
           {/* 1. Mandate passbook */}
           <Card surface="ledger">
             <CardContent className="space-y-4 pt-5">
               <div className="flex items-baseline justify-between gap-3">
-                <h2 className="font-display text-lg font-semibold tracking-tight text-rzp-text">Mandate</h2>
-                <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-rzp-muted">Passbook</span>
+                <h2 className="font-display text-lg font-semibold tracking-tight text-rzp-text">{t("mandate.title")}</h2>
+                <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-rzp-muted">{t("mandate.passbook")}</span>
               </div>
 
               {mandate ? (
                 <dl className="space-y-1.5 text-sm">
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-rzp-muted">Agent</dt>
+                    <dt className="text-rzp-muted">{t("mandate.agent")}</dt>
                     <dd className="font-mono text-xs tnum text-rzp-text">{mandate.view.agent_id}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-rzp-muted">For</dt>
+                    <dt className="text-rzp-muted">{t("mandate.for")}</dt>
                     <dd className="truncate font-mono text-xs tnum text-rzp-text" title={mandate.view.user_ref}>
                       {mandate.view.user_ref}
                     </dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3 border-t border-rzp-border pt-2">
-                    <dt className="font-medium text-rzp-text">Cap</dt>
+                    <dt className="font-medium text-rzp-text">{t("mandate.cap")}</dt>
                     <dd className="font-mono text-2xl font-semibold tnum text-[#087443]">{formatINR(mandate.view.spend_cap_paise)}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-rzp-muted">Scope</dt>
+                    <dt className="text-rzp-muted">{t("mandate.scope")}</dt>
                     <dd className="text-right text-rzp-text">{mandate.view.scope}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-rzp-muted">Expires in</dt>
-                    <ExpiryCountdown mandate={mandate} onExpire={onExpire} />
+                    <dt className="text-rzp-muted">{t("mandate.expiresIn")}</dt>
+                    <ExpiryCountdown mandate={mandate} onExpire={onExpire} expiredLabel={t("mandate.expired")} />
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-rzp-muted">Mandate id</dt>
+                    <dt className="text-rzp-muted">{t("mandate.id")}</dt>
                     <dd className="truncate font-mono text-[11px] tnum text-rzp-muted" title={mandate.view.id}>
                       {mandate.view.id}
                     </dd>
@@ -795,15 +804,15 @@ export default function SimulatorPage() {
                       <Skeleton className="h-8 w-1/2" />
                     </div>
                   ) : (
-                    <p className="text-sm text-rzp-muted">No mandate yet. Issue one to let the buyer in.</p>
+                    <p className="text-sm text-rzp-muted">{t("mandate.none")}</p>
                   )}
                 </div>
               )}
-              {expired ? <p className="text-xs text-[#B3262C]">This mandate has expired. Issue a fresh one before the buyer talks again.</p> : null}
+              {expired ? <p className="text-xs text-[#B3262C]">{t("mandate.expiredNote")}</p> : null}
 
               <div className="space-y-2.5 border-t border-rzp-border pt-3">
                 <p className="text-xs font-medium text-rzp-muted" id="cap-label">
-                  Spend cap for the next mandate
+                  {t("mandate.capLabel")}
                 </p>
                 <div className="grid grid-cols-3 gap-1 rounded-xl bg-rzp-mist2 p-1" role="group" aria-labelledby="cap-label">
                   {CAP_PRESETS.map((cap) => (
@@ -829,13 +838,13 @@ export default function SimulatorPage() {
                       capChoice === "custom" ? "bg-white font-semibold text-rzp-blueDeep shadow-sm" : "text-rzp-muted hover:text-rzp-text",
                     )}
                   >
-                    Custom
+                    {t("mandate.custom")}
                   </button>
                 </div>
                 {capChoice === "custom" ? (
                   <div>
                     <Label htmlFor="custom-cap" className="text-xs">
-                      Cap in rupees
+                      {t("mandate.capRupees")}
                     </Label>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm text-rzp-muted" aria-hidden="true">
@@ -862,9 +871,9 @@ export default function SimulatorPage() {
                   </FieldHint>
                 ) : null}
                 <Button className="w-full" onClick={() => void issueFromSelector()} loading={issuing} disabled={running || issuing}>
-                  Issue new mandate
+                  {t("mandate.issue")}
                 </Button>
-                <p className="text-[11px] text-rzp-muted">Scope stays handloom, gifts. A new mandate clears the conversation.</p>
+                <p className="text-[11px] text-rzp-muted">{t("mandate.scopeNote")}</p>
               </div>
             </CardContent>
           </Card>
@@ -873,22 +882,21 @@ export default function SimulatorPage() {
           <Card>
             <CardContent className="space-y-3 pt-5">
               <div>
-                <h2 className="font-display text-lg font-semibold tracking-tight text-rzp-text">Run a demo buyer</h2>
-                <p className="mt-0.5 text-xs text-rzp-muted">Pick a goal. The buyer only talks; the engine decides.</p>
+                <h2 className="font-display text-lg font-semibold tracking-tight text-rzp-text">{t("goals.title")}</h2>
+                <p className="mt-0.5 text-xs text-rzp-muted">{t("goals.subtitle")}</p>
               </div>
               {goalsError ? <p className="text-sm text-[#B3262C]">{goalsError}</p> : null}
               {goals.length === 0 && !goalsError ? (
-                <div className="space-y-2" aria-busy="true" aria-label="Loading demo goals">
+                <div className="space-y-2" aria-busy="true" aria-label={t("goals.loading")}>
                   <Skeleton className="h-[74px] w-full rounded-xl" />
                   <Skeleton className="h-[74px] w-full rounded-xl" />
                   <Skeleton className="h-[74px] w-full rounded-xl" />
                 </div>
               ) : null}
-              <div className="space-y-2" role="group" aria-label="Demo goals">
+              <div className="space-y-2" role="group" aria-label={t("goals.group")}>
                 {goals.map((goal) => {
                   const active = runningGoal === goal.key;
-                  const art = GOAL_ART[goal.key];
-                  const Art = art?.Art ?? RupeeCoin;
+                  const Art = GOAL_ART[goal.key] ?? RupeeCoin;
                   return (
                     <button
                       key={goal.key}
@@ -909,8 +917,8 @@ export default function SimulatorPage() {
                         <Art className="w-12" animate={false} />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-rzp-text">{goal.label}</span>
-                        <span className="mt-0.5 block text-xs leading-snug text-rzp-muted">{art?.blurb ?? goal.goal}</span>
+                        <span className="block text-sm font-semibold text-rzp-text">{t(`goal.${goal.key}.label` as SimulatorKey, { cap: formatINR(goal.cap_paise) })}</span>
+                        <span className="mt-0.5 block text-xs leading-snug text-rzp-muted">{t(`goal.${goal.key}.blurb` as SimulatorKey)}</span>
                       </span>
                       {active ? (
                         <Spinner className="h-4 w-4 shrink-0 text-rzp-blue" />
@@ -928,13 +936,13 @@ export default function SimulatorPage() {
           <Card>
             <CardContent className="space-y-2 pt-5">
               <h2 className="font-display text-lg font-semibold tracking-tight text-rzp-text">
-                <label htmlFor="buyer-line">Talk as the buyer</label>
+                <label htmlFor="buyer-line">{t("input.title")}</label>
               </h2>
               <div className="flex gap-2">
                 <Input
                   id="buyer-line"
                   value={draft}
-                  placeholder="Ask for a saree under ₹2,000…"
+                  placeholder={t("input.placeholder")}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.nativeEvent.isComposing) {
@@ -947,19 +955,19 @@ export default function SimulatorPage() {
                 />
                 <Button onClick={() => void sendManual()} disabled={running || draft.trim().length === 0} className="shrink-0">
                   <SendIcon className="h-4 w-4" />
-                  Send
+                  {t("input.send")}
                 </Button>
               </div>
-              <p className="text-[11px] text-rzp-muted">Enter sends. The line goes to the seller under the current mandate.</p>
+              <p className="text-[11px] text-rzp-muted">{t("input.hint")}</p>
             </CardContent>
           </Card>
 
           {/* 4. Modes */}
           <p className="px-1 text-xs text-rzp-muted">
-            Seller <span className="font-mono text-rzp-text">{shownSellerMode ?? "—"}</span> · payments{" "}
-            <span className="font-mono text-rzp-text">{modes?.payments ?? "—"}</span> · voice{" "}
-            <span className="font-mono text-rzp-text">{voice.provider === "none" ? "—" : voice.enabled ? voice.provider : "off"}</span>
-            {shownSellerMode === "fallback" ? <span> · scripted seller, no key needed</span> : null}
+            {t("modes.seller")} <span className="font-mono text-rzp-text">{shownSellerMode ?? "—"}</span> · {t("modes.payments")}{" "}
+            <span className="font-mono text-rzp-text">{modes?.payments ?? "—"}</span> · {t("modes.voice")}{" "}
+            <span className="font-mono text-rzp-text">{voice.provider === "none" ? "—" : voice.enabled ? voice.provider : t("modes.off")}</span>
+            {shownSellerMode === "fallback" ? <span> · {t("modes.scriptedNote")}</span> : null}
           </p>
         </aside>
       </div>

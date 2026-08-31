@@ -13,6 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError, sleep, type OnboardResponse } from "@/lib/demo/client";
+import { useT, type Translator } from "@/lib/i18n/core";
+import { onboard, type OnboardKey } from "@/lib/i18n/strings/onboard";
 import { formatINR, paiseToRupees, rupeesToPaise } from "@/lib/money";
 import type { Policy, Sku } from "@/lib/schemas";
 import { isTourActive, useTourAction, type TourEventDetail } from "@/lib/tour/client";
@@ -26,8 +28,6 @@ type Step = "catalog" | "review";
 type PolicyKey = keyof Policy;
 
 const DEFAULT_MERCHANT = "Ramesh Handlooms";
-const NETWORK_ERROR = "Could not reach the shop. Check that the app is running and try again.";
-const NOT_UNDERSTOOD = "Samajh nahi aaya, dobara boliye.";
 
 interface DraftInput {
   csv: string;
@@ -69,15 +69,15 @@ function skusToCsv(skus: Sku[]): string {
   return lines.join("\n");
 }
 
-function patchWords(patch: Partial<Policy>): string[] {
+function patchWords(patch: Partial<Policy>, t: Translator<OnboardKey>): string[] {
   const words: string[] = [];
-  if (patch.price_floor_pct !== undefined) words.push(`minimum price ${patch.price_floor_pct}%`);
-  if (patch.max_discount_pct !== undefined) words.push(`maximum discount ${patch.max_discount_pct}%`);
-  if (patch.max_qty_per_order !== undefined) words.push(`max ${patch.max_qty_per_order} items per order`);
-  if (patch.gate_above_paise !== undefined) words.push(`ask me above ${formatINR(patch.gate_above_paise)}`);
-  if (patch.max_order_value_paise !== undefined) words.push(`biggest order ${formatINR(patch.max_order_value_paise)}`);
-  if (patch.category_allowlist !== undefined) words.push(`sell only ${patch.category_allowlist.join(", ") || "nothing"}`);
-  if (patch.refund_policy !== undefined) words.push(`returns: ${patch.refund_policy}`);
+  if (patch.price_floor_pct !== undefined) words.push(t("words.floor", { pct: patch.price_floor_pct }));
+  if (patch.max_discount_pct !== undefined) words.push(t("words.discount", { pct: patch.max_discount_pct }));
+  if (patch.max_qty_per_order !== undefined) words.push(t("words.qty", { n: patch.max_qty_per_order }));
+  if (patch.gate_above_paise !== undefined) words.push(t("words.gate", { amount: formatINR(patch.gate_above_paise) }));
+  if (patch.max_order_value_paise !== undefined) words.push(t("words.maxOrder", { amount: formatINR(patch.max_order_value_paise) }));
+  if (patch.category_allowlist !== undefined) words.push(t("words.categories", { list: patch.category_allowlist.join(", ") || t("words.nothing") }));
+  if (patch.refund_policy !== undefined) words.push(t("words.refund", { text: patch.refund_policy }));
   return words;
 }
 
@@ -118,14 +118,12 @@ function cleanSkus(skus: Sku[]): Sku[] | null {
   return out.length > 0 ? out : null;
 }
 
-const SOURCE_LABEL: Record<OnboardResponse["source"], string> = {
-  csv: "from your CSV",
-  url: "from your store page",
-  llm: "read off your store page",
-  fallback: "from the sample catalog",
+const SOURCE_LABEL: Record<OnboardResponse["source"], OnboardKey> = {
+  csv: "source.csv",
+  url: "source.url",
+  llm: "source.llm",
+  fallback: "source.fallback",
 };
-
-const FALLBACK_NOTE = "We could not read products from what you gave us, so this is the sample catalog. Edit these rows, or go back and paste a CSV with name and price columns.";
 
 const ERROR_TEXT = "text-[#B3262C]";
 
@@ -134,11 +132,7 @@ const CELL =
   "h-9 rounded-lg border-transparent bg-transparent px-2 shadow-none hover:border-rzp-border hover:bg-rzp-mist " +
   "focus:border-rzp-blue focus:bg-white disabled:cursor-default disabled:bg-transparent disabled:text-rzp-text";
 
-const NEXT_STEPS = [
-  "AI reads the catalog and drafts a rulebook.",
-  "You approve every line — humans set the rules.",
-  "Every sale gets written in the book.",
-] as const;
+const NEXT_STEPS: readonly OnboardKey[] = ["next.1", "next.2", "next.3"];
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -146,6 +140,10 @@ const NEXT_STEPS = [
 
 export default function OnboardPage() {
   const { toast } = useToast();
+  const t = useT(onboard);
+  /** stable handle for callbacks that outlive a render */
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [step, setStep] = useState<Step>("catalog");
   const [merchantName, setMerchantName] = useState(DEFAULT_MERCHANT);
@@ -204,7 +202,7 @@ export default function OnboardPage() {
       setCsv(text);
       return text;
     } catch {
-      setDraftError("Could not load the sample catalog. Paste a CSV with name and price columns instead.");
+      setDraftError(tRef.current("error.sample"));
       return null;
     } finally {
       setSampleLoading(false);
@@ -218,7 +216,7 @@ export default function OnboardPage() {
       setCsv(text);
       setDraftError(null);
     } catch {
-      setDraftError(`Could not read ${file.name}. Paste the CSV text instead.`);
+      setDraftError(tRef.current("error.file", { name: file.name }));
     }
   }, []);
 
@@ -226,7 +224,7 @@ export default function OnboardPage() {
     const csvText = input.csv.trim();
     const url = normalizeUrl(input.url);
     if (!csvText && !url) {
-      setDraftError("Paste a CSV or enter a store URL first. The sample catalog works too.");
+      setDraftError(tRef.current("error.needInput"));
       return false;
     }
     setDrafting(true);
@@ -239,7 +237,7 @@ export default function OnboardPage() {
         voice_utterance: input.utterance.trim() || undefined,
       });
       if (!res.skus || res.skus.length === 0) {
-        setDraftError("No products found. Paste a CSV with name and price columns.");
+        setDraftError(tRef.current("error.noProducts"));
         return false;
       }
       setSkus(res.skus);
@@ -249,7 +247,11 @@ export default function OnboardPage() {
       setConfirmError(null);
       if (res.voice) {
         const keys = patchKeys(res.voice.patch);
-        setVoiceNote(keys.length > 0 ? `Set: ${patchWords(res.voice.patch).join(", ")}` : res.voice.spoken_confirmation || NOT_UNDERSTOOD);
+        setVoiceNote(
+          keys.length > 0
+            ? tRef.current("voice.set", { words: patchWords(res.voice.patch, tRef.current).join(", ") })
+            : res.voice.spoken_confirmation || tRef.current("voice.notUnderstood"),
+        );
         flash(keys);
         speak(res.voice.spoken_confirmation);
       } else {
@@ -258,7 +260,7 @@ export default function OnboardPage() {
       goToStep("review");
       return true;
     } catch (err) {
-      setDraftError(messageFor(err, NETWORK_ERROR));
+      setDraftError(messageFor(err, tRef.current("error.network")));
       return false;
     } finally {
       setDrafting(false);
@@ -295,7 +297,7 @@ export default function OnboardPage() {
     async (text: string) => {
       if (!policy || live) return;
       setVoiceBusy(true);
-      setVoiceNote(`Suna: “${text}”`);
+      setVoiceNote(tRef.current("voice.heard", { text }));
       try {
         const res = await api.onboard({
           csv: csv.trim() || skusToCsv(skus),
@@ -304,21 +306,21 @@ export default function OnboardPage() {
         });
         const voice = res.voice;
         if (!voice) {
-          setVoiceNote(NOT_UNDERSTOOD);
+          setVoiceNote(tRef.current("voice.notUnderstood"));
           return;
         }
         const keys = patchKeys(voice.patch);
         if (keys.length > 0) {
           const patch = voice.patch;
           setPolicy((prev) => (prev ? { ...prev, ...patch } : prev));
-          setVoiceNote(`Set: ${patchWords(patch).join(", ")}`);
+          setVoiceNote(tRef.current("voice.set", { words: patchWords(patch, tRef.current).join(", ") }));
         } else {
-          setVoiceNote(voice.spoken_confirmation || NOT_UNDERSTOOD);
+          setVoiceNote(voice.spoken_confirmation || tRef.current("voice.notUnderstood"));
         }
         flash(keys);
         speak(voice.spoken_confirmation);
       } catch (err) {
-        setVoiceNote(messageFor(err, "Could not reach the shop. Your sliders are unchanged — try again or drag them."));
+        setVoiceNote(messageFor(err, tRef.current("voice.error")));
       } finally {
         setVoiceBusy(false);
       }
@@ -330,7 +332,7 @@ export default function OnboardPage() {
     if (!policy || live) return false;
     const cleaned = cleanSkus(skus);
     if (!cleaned) {
-      setConfirmError("Every product needs a name before the shop goes live. Fill the empty name in the table.");
+      setConfirmError(tRef.current("error.needName"));
       return false;
     }
     setConfirming(true);
@@ -339,10 +341,10 @@ export default function OnboardPage() {
       await api.confirmPolicy({ merchant_name: merchantName.trim() || DEFAULT_MERCHANT, skus: cleaned, policy });
       setSkus(cleaned);
       setLive(true);
-      toast("Dukaan live hai ✓", "money");
+      toast(tRef.current("toast.live"), "money");
       return true;
     } catch (err) {
-      setConfirmError(messageFor(err, NETWORK_ERROR));
+      setConfirmError(messageFor(err, tRef.current("error.network")));
       return false;
     } finally {
       setConfirming(false);
@@ -404,11 +406,11 @@ export default function OnboardPage() {
     step === "review" ? (
       live ? (
         <Badge tone="green" dot className="h-8 px-3 text-sm">
-          Live
+          {t("golive.liveButton")}
         </Badge>
       ) : (
         <Button type="button" variant="secondary" size="sm" onClick={() => goToStep("catalog")} disabled={confirming}>
-          Back to catalog
+          {t("action.back")}
         </Button>
       )
     ) : undefined;
@@ -416,8 +418,8 @@ export default function OnboardPage() {
   return (
     <AppShell
       section="onboard"
-      title="Onboard a shop"
-      subtitle="Apni dukaan AI buyers ke liye kholiye — catalog paste karo, rulebook approve karo."
+      title={t("page.title")}
+      subtitle={t("page.subtitle")}
       actions={headerActions}
       headerExtra={<Stepper step={step} live={live} />}
     >
@@ -435,13 +437,13 @@ export default function OnboardPage() {
             <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
               <div className="p-5 sm:p-7">
                 <div className="mb-5">
-                  <h2 className="font-display text-xl font-semibold tracking-tight text-rzp-text">Your shop</h2>
-                  <p className="mt-1 text-sm text-rzp-muted">Naam, website (optional) aur catalog. A CSV with name and price columns is enough.</p>
+                  <h2 className="font-display text-xl font-semibold tracking-tight text-rzp-text">{t("shop.title")}</h2>
+                  <p className="mt-1 text-sm text-rzp-muted">{t("shop.subtitle")}</p>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="merchant-name">Shop name</Label>
+                    <Label htmlFor="merchant-name">{t("field.name")}</Label>
                     <Input
                       id="merchant-name"
                       value={merchantName}
@@ -452,7 +454,7 @@ export default function OnboardPage() {
                   </div>
                   <div>
                     <Label htmlFor="store-url">
-                      Store URL <span className="font-normal text-rzp-muted">(optional)</span>
+                      {t("field.url")} <span className="font-normal text-rzp-muted">{t("field.optional")}</span>
                     </Label>
                     <Input
                       id="store-url"
@@ -468,7 +470,7 @@ export default function OnboardPage() {
                 <div className="mt-5">
                   <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
                     <Label htmlFor="catalog-csv" className="mb-0">
-                      Catalog CSV
+                      {t("field.csv")}
                     </Label>
                     <button
                       type="button"
@@ -478,7 +480,7 @@ export default function OnboardPage() {
                       className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-rzp-blueDeep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {sampleLoading ? <Spinner className="h-3.5 w-3.5" /> : <SparkIcon className="h-3.5 w-3.5" />}
-                      Use Ramesh ji’s sample catalog
+                      {t("sample.load")}
                     </button>
                   </div>
 
@@ -508,20 +510,20 @@ export default function OnboardPage() {
                       onChange={(e) => setCsv(e.target.value)}
                       rows={9}
                       spellCheck={false}
-                      placeholder={"name,price,stock,category\nCotton Handloom Saree,1499,15,handloom\nBrass Diya Gift Set,499,25,gifts"}
+                      placeholder={t("csv.placeholder")}
                       className="relative z-[1] min-h-[200px] border-transparent bg-transparent shadow-none hover:border-transparent focus:border-transparent focus:ring-0"
                     />
                     <div className="relative z-[1] flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 pt-2 text-xs text-rzp-muted">
                       <UploadIcon className="h-4 w-4 text-rzp-blueDeep" />
-                      <span>Drop a .csv file here, or</span>
+                      <span>{t("drop.text1")}</span>
                       <button
                         type="button"
                         onClick={() => fileInput.current?.click()}
                         className="rounded-sm font-medium text-rzp-blueDeep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-1"
                       >
-                        choose a file
+                        {t("drop.choose")}
                       </button>
-                      <span>from your computer.</span>
+                      <span>{t("drop.text2")}</span>
                       <input
                         ref={fileInput}
                         type="file"
@@ -543,39 +545,39 @@ export default function OnboardPage() {
                 />
                 {utterance ? (
                   <p className="mt-3 text-sm text-rzp-text" aria-live="polite">
-                    Suna: <span className="italic">“{utterance}”</span> — yeh rule draft mein jud jayega.{" "}
+                    {t("heard.prefix")} <span className="italic">“{utterance}”</span> {t("heard.note")}{" "}
                     <button
                       type="button"
                       onClick={() => setUtterance("")}
                       className="rounded-sm font-medium text-rzp-blueDeep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-1"
                     >
-                      Hatao
+                      {t("heard.remove")}
                     </button>
                   </p>
                 ) : null}
 
                 <div className="mt-6 flex flex-wrap items-center gap-4">
                   <Button type="submit" size="lg" loading={drafting} disabled={drafting || sampleLoading}>
-                    Draft my shop
+                    {t("submit.draft")}
                   </Button>
                   {draftError ? (
                     <p className={cn("text-sm", ERROR_TEXT)} role="alert">
                       {draftError}
                     </p>
                   ) : (
-                    <p className="text-sm text-rzp-muted">AI reads the catalog and drafts your rulebook. You approve it next.</p>
+                    <p className="text-sm text-rzp-muted">{t("submit.hint")}</p>
                   )}
                 </div>
               </div>
 
               <aside className="relative hidden border-l border-rzp-border bg-rzp-mist2 bg-dots lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-6">
-                <Storefront className="w-full max-w-[250px]" title="A small storefront, open for AI buyers" />
-                <p className="mt-4 self-stretch text-[11px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">What happens next</p>
+                <Storefront className="w-full max-w-[250px]" title={t("storefront.alt")} />
+                <p className="mt-4 self-stretch text-[11px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">{t("next.title")}</p>
                 <ol className="mt-2 space-y-2 self-stretch text-sm text-rzp-text">
                   {NEXT_STEPS.map((line) => (
                     <li key={line} className="flex gap-2.5">
                       <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-rzp-blueDeep" />
-                      <span>{line}</span>
+                      <span>{t(line)}</span>
                     </li>
                   ))}
                 </ol>
@@ -592,15 +594,18 @@ export default function OnboardPage() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>Catalog</CardTitle>
+                  <CardTitle>{t("catalog.title")}</CardTitle>
                   <CardDescription>
-                    {skus.length} {skus.length === 1 ? "product" : "products"} {draftSource ? SOURCE_LABEL[draftSource] : "drafted"}. Edit anything before going
-                    live.
+                    {t("catalog.count", {
+                      count: skus.length,
+                      noun: t(skus.length === 1 ? "catalog.product" : "catalog.products"),
+                      source: t(draftSource ? SOURCE_LABEL[draftSource] : "source.drafted"),
+                    })}
                   </CardDescription>
-                  {draftSource === "fallback" ? <p className="mt-2 text-sm text-[#9A4F00]">{FALLBACK_NOTE}</p> : null}
+                  {draftSource === "fallback" ? <p className="mt-2 text-sm text-[#9A4F00]">{t("fallback.note")}</p> : null}
                 </div>
                 <Badge tone={allowedCount > 0 ? "blue" : "amber"} className="shrink-0">
-                  {allowedCount} of {skus.length} sellable
+                  {t("sellable", { allowed: allowedCount, total: skus.length })}
                 </Badge>
               </CardHeader>
               <CardContent>
@@ -609,16 +614,16 @@ export default function OnboardPage() {
                     <thead>
                       <tr className="text-left text-[11px] uppercase tracking-[0.14em] text-rzp-muted">
                         <th scope="col" className="pb-2 pl-2 pr-2 font-semibold">
-                          Product
+                          {t("th.product")}
                         </th>
                         <th scope="col" className="pb-2 pr-2 font-semibold">
-                          Category
+                          {t("th.category")}
                         </th>
                         <th scope="col" className="pb-2 pr-2 text-right font-semibold">
-                          Price ₹
+                          {t("th.price")}
                         </th>
                         <th scope="col" className="pb-2 pr-2 text-right font-semibold">
-                          Stock
+                          {t("th.stock")}
                         </th>
                       </tr>
                     </thead>
@@ -628,14 +633,14 @@ export default function OnboardPage() {
                           <td className="py-1 pr-2">
                             <div className="flex items-center gap-1">
                               <Input
-                                aria-label={`Emoji for ${s.name || "product"}`}
+                                aria-label={t("cell.emoji", { name: s.name || t("cell.product") })}
                                 value={s.image_emoji}
                                 onChange={(e) => updateSku(i, { image_emoji: e.target.value })}
                                 disabled={live}
                                 className={cn(CELL, "w-12 px-1 text-center text-lg")}
                               />
                               <Input
-                                aria-label={`Name of product ${i + 1}`}
+                                aria-label={t("cell.name", { n: i + 1 })}
                                 value={s.name}
                                 onChange={(e) => updateSku(i, { name: e.target.value })}
                                 disabled={live}
@@ -653,7 +658,7 @@ export default function OnboardPage() {
                               min={0}
                               step={1}
                               inputMode="decimal"
-                              aria-label={`Price in rupees for ${s.name || "product"}`}
+                              aria-label={t("cell.price", { name: s.name || t("cell.product") })}
                               value={paiseToRupees(s.price_paise)}
                               onChange={(e) => {
                                 const n = Number(e.target.value);
@@ -669,7 +674,7 @@ export default function OnboardPage() {
                               min={0}
                               step={1}
                               inputMode="numeric"
-                              aria-label={`Stock for ${s.name || "product"}`}
+                              aria-label={t("cell.stock", { name: s.name || t("cell.product") })}
                               value={s.stock}
                               onChange={(e) => {
                                 const n = Number.parseInt(e.target.value, 10);
@@ -684,9 +689,7 @@ export default function OnboardPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-3 text-xs text-rzp-muted">
-                  Prices are list prices in rupees. Categories outside the rulebook’s allowlist stay in the catalog but cannot be sold to AI buyers.
-                </p>
+                <p className="mt-3 text-xs text-rzp-muted">{t("catalog.note")}</p>
               </CardContent>
             </Card>
 
@@ -694,56 +697,56 @@ export default function OnboardPage() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>Rulebook</CardTitle>
-                  <CardDescription>AI ne draft kiya, aap approve karo. The policy engine enforces every line — the AI never decides.</CardDescription>
+                  <CardTitle>{t("rulebook.title")}</CardTitle>
+                  <CardDescription>{t("rulebook.subtitle")}</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="space-y-1">
-                <div className="mb-3 flex flex-wrap gap-2" aria-label="Rulebook summary">
+                <div className="mb-3 flex flex-wrap gap-2" aria-label={t("rulebook.summary")}>
                   <Badge tone="blue" dot>
-                    Floor {policy.price_floor_pct}%
+                    {t("pill.floor", { pct: policy.price_floor_pct })}
                   </Badge>
                   <Badge tone="blue" dot>
-                    Max discount {policy.max_discount_pct}%
+                    {t("pill.discount", { pct: policy.max_discount_pct })}
                   </Badge>
                   <Badge tone="violet" dot>
-                    Ask me above {formatINR(policy.gate_above_paise)}
+                    {t("pill.gate", { amount: formatINR(policy.gate_above_paise) })}
                   </Badge>
                   <Badge tone="gray" dot>
-                    Max {policy.max_qty_per_order} {policy.max_qty_per_order === 1 ? "item" : "items"}
+                    {policy.max_qty_per_order === 1 ? t("pill.qtyOne") : t("pill.qty", { n: policy.max_qty_per_order })}
                   </Badge>
                 </div>
 
                 <RuleRow highlighted={highlight.has("price_floor_pct")}>
                   <Slider
                     id="price-floor"
-                    label="Minimum price protection"
+                    label={t("rule.floor.label")}
                     value={policy.price_floor_pct}
                     min={50}
                     max={100}
                     format={(v) => `${v}%`}
                     onChange={(v) => setPolicyField("price_floor_pct", v)}
-                    hint="Buyers cannot push a price below this share of the list price."
+                    hint={t("rule.floor.hint")}
                     disabled={live}
                   />
                 </RuleRow>
                 <RuleRow highlighted={highlight.has("max_discount_pct")}>
                   <Slider
                     id="max-discount"
-                    label="Maximum discount"
+                    label={t("rule.discount.label")}
                     value={policy.max_discount_pct}
                     min={0}
                     max={50}
                     format={(v) => `${v}%`}
                     onChange={(v) => setPolicyField("max_discount_pct", v)}
-                    hint="The most the seller agent may take off any offer."
+                    hint={t("rule.discount.hint")}
                     disabled={live}
                   />
                 </RuleRow>
                 <RuleRow highlighted={highlight.has("max_qty_per_order")}>
                   <Slider
                     id="max-qty"
-                    label="Max items per order"
+                    label={t("rule.qty.label")}
                     value={policy.max_qty_per_order}
                     min={1}
                     max={10}
@@ -754,35 +757,35 @@ export default function OnboardPage() {
                 <RuleRow highlighted={highlight.has("gate_above_paise")}>
                   <Slider
                     id="gate-above"
-                    label="Ask me above"
+                    label={t("rule.gate.label")}
                     value={policy.gate_above_paise}
                     min={100_000}
                     max={5_000_000}
                     step={50_000}
                     format={(v) => formatINR(v)}
                     onChange={(v) => setPolicyField("gate_above_paise", v)}
-                    hint="Orders above this wait for your approval in the Control Tower."
+                    hint={t("rule.gate.hint")}
                     disabled={live}
                   />
                 </RuleRow>
                 <RuleRow highlighted={highlight.has("max_order_value_paise")}>
                   <Slider
                     id="max-order"
-                    label="Biggest order allowed"
+                    label={t("rule.maxOrder.label")}
                     value={policy.max_order_value_paise}
                     min={100_000}
                     max={20_000_000}
                     step={50_000}
                     format={(v) => formatINR(v)}
                     onChange={(v) => setPolicyField("max_order_value_paise", v)}
-                    hint="Anything larger is refused outright."
+                    hint={t("rule.maxOrder.hint")}
                     disabled={live}
                   />
                 </RuleRow>
 
                 <RuleRow highlighted={highlight.has("category_allowlist")} className="pt-3">
-                  <p className="mb-2 text-sm font-medium text-rzp-text">Categories AI buyers may buy</p>
-                  <div className="flex flex-wrap gap-2" role="group" aria-label="Category allowlist">
+                  <p className="mb-2 text-sm font-medium text-rzp-text">{t("rule.categories.label")}</p>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label={t("rule.categories.aria")}>
                     {categories.map((c) => {
                       const on = policy.category_allowlist.includes(c);
                       return (
@@ -806,32 +809,30 @@ export default function OnboardPage() {
                     })}
                   </div>
                   <p className={cn("mt-2 text-xs", allowlistEmpty ? ERROR_TEXT : "text-rzp-muted")}>
-                    {allowlistEmpty
-                      ? "No category is on — AI buyers cannot buy anything. Turn one on to sell."
-                      : "Off means an AI buyer asking for it gets a polite DENY and an in-scope alternative."}
+                    {allowlistEmpty ? t("rule.categories.empty") : t("rule.categories.off")}
                   </p>
                 </RuleRow>
 
                 <RuleRow highlighted={highlight.has("refund_policy")} className="pt-3">
-                  <Label htmlFor="refund-policy">Return policy</Label>
+                  <Label htmlFor="refund-policy">{t("rule.refund.label")}</Label>
                   <Input
                     id="refund-policy"
                     value={policy.refund_policy}
                     onChange={(e) => setPolicyField("refund_policy", e.target.value)}
                     disabled={live}
-                    placeholder="7-day easy returns on unused items."
+                    placeholder={t("rule.refund.placeholder")}
                   />
                 </RuleRow>
 
                 <div className="pt-4">
                   <VoiceMic
-                    label="Boliye: 'discount 5% se zyada mat dena' — rulebook awaaz se badlega."
+                    label={t("mic.label2")}
                     onTranscript={(text) => void onReviewTranscript(text)}
                     disabled={voiceBusy || live || confirming}
                     className="rounded-2xl border border-rzp-border bg-rzp-mist p-4"
                   />
                   <p className="mt-2 min-h-[1.25rem] text-sm text-rzp-text" aria-live="polite">
-                    {voiceBusy ? "Samajh raha hoon…" : voiceNote}
+                    {voiceBusy ? t("voice.busy") : voiceNote}
                   </p>
                 </div>
               </CardContent>
@@ -839,17 +840,17 @@ export default function OnboardPage() {
           </div>
 
           {/* ---- Sticky action bar ------------------------------------ */}
-          <section aria-label="Go live" className="sticky bottom-4 z-20">
+          <section aria-label={t("golive.aria")} className="sticky bottom-4 z-20">
             <div className="rounded-2xl border border-rzp-border bg-white/90 p-4 shadow-lift backdrop-blur-md sm:px-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   {live ? (
                     <p className="text-sm text-[#087443]">
-                      <span className="font-semibold">{shopName} is live.</span> AI buyers can now shop inside these rules — every action gets written in the book.
+                      <span className="font-semibold">{t("golive.liveName", { name: shopName })}</span> {t("golive.liveRest")}
                     </p>
                   ) : (
                     <p className="text-sm text-rzp-muted">
-                      Approving publishes <span className="font-medium text-rzp-text">{shopName}</span> with this catalog and rulebook. Nothing sells before that.
+                      {t("golive.pendingBefore")} <span className="font-medium text-rzp-text">{shopName}</span> {t("golive.pendingAfter")}
                     </p>
                   )}
                   {confirmError ? (
@@ -862,10 +863,10 @@ export default function OnboardPage() {
                   {live ? (
                     <>
                       <Link href="/simulator" className={buttonClasses({ variant: "outline-blue", size: "md" })}>
-                        Open the simulator
+                        {t("golive.openSimulator")}
                       </Link>
                       <Link href="/dashboard" className={buttonClasses({ variant: "secondary", size: "md" })}>
-                        Open Control Tower
+                        {t("golive.openTower")}
                       </Link>
                     </>
                   ) : null}
@@ -878,7 +879,7 @@ export default function OnboardPage() {
                     disabled={live || confirming}
                     className={cn(live && "disabled:opacity-100")}
                   >
-                    {live ? "Live ✓" : "Approve & go live"}
+                    {live ? t("golive.liveButton") : t("golive.approve")}
                   </Button>
                 </div>
               </div>
@@ -894,14 +895,15 @@ export default function OnboardPage() {
 /*  Pieces                                                             */
 /* ------------------------------------------------------------------ */
 
-const STEPS: ReadonlyArray<{ key: Step; n: number; label: string }> = [
-  { key: "catalog", n: 1, label: "Catalog" },
-  { key: "review", n: 2, label: "Rulebook" },
+const STEPS: ReadonlyArray<{ key: Step; n: number; labelKey: OnboardKey }> = [
+  { key: "catalog", n: 1, labelKey: "step.catalog" },
+  { key: "review", n: 2, labelKey: "step.rulebook" },
 ];
 
 function Stepper({ step, live }: { step: Step; live: boolean }) {
+  const t = useT(onboard);
   return (
-    <nav aria-label="Onboarding progress" className="flex flex-wrap items-center gap-2 sm:gap-3">
+    <nav aria-label={t("stepper.aria")} className="flex flex-wrap items-center gap-2 sm:gap-3">
       {STEPS.map((s, i) => {
         const active = step === s.key;
         const done = s.key === "catalog" ? step === "review" : live;
@@ -918,7 +920,7 @@ function Stepper({ step, live }: { step: Step; live: boolean }) {
               )}
             >
               {done ? <CheckIcon className="h-3.5 w-3.5" /> : <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />}
-              {`Step ${s.n} of 2 · ${s.label}`}
+              {t("step.of", { n: s.n, label: t(s.labelKey) })}
             </span>
           </Fragment>
         );
@@ -928,13 +930,14 @@ function Stepper({ step, live }: { step: Step; live: boolean }) {
 }
 
 function DraftingSkeleton() {
+  const t = useT(onboard);
   const rows = [0, 1, 2, 3, 4, 5];
   const rules = [0, 1, 2, 3, 4];
   return (
     <div className="fade-up space-y-6" aria-busy="true">
       <p role="status" className="flex items-center gap-2 text-sm text-rzp-muted">
         <Spinner className="h-4 w-4 text-rzp-blue" />
-        Reading your catalog and drafting the rulebook…
+        {t("drafting.status")}
       </p>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
         <Card>
