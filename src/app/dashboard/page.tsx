@@ -435,6 +435,33 @@ interface LedgerState {
   chain: LedgerResponse["chain"];
 }
 
+/** Development-only: edits the newest money row so the chain badge flips ✗ — the tamper-detection demo. */
+function TamperDemoButton() {
+  const t = useT(dashboard);
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await fetch("/api/dev/tamper", { method: "POST" });
+          toast(res.ok ? t("book.tamperDone") : t("book.tamperFailed"), res.ok ? "deny" : "ink");
+        } catch {
+          toast(t("book.tamperFailed"), "ink");
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="inline-flex h-8 items-center rounded-lg border border-dashed border-rzp-red/50 bg-white px-2.5 text-xs font-medium text-[#B3262C] transition-colors hover:bg-rzp-red/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 disabled:opacity-50"
+    >
+      {t("book.tamper")}
+    </button>
+  );
+}
+
 function TheBook({ ledger, view, onView }: { ledger: LedgerState | null; view: LedgerView; onView: (next: LedgerView) => void }) {
   const t = useT(dashboard);
   const chain = ledger?.chain ?? null;
@@ -464,6 +491,14 @@ function TheBook({ ledger, view, onView }: { ledger: LedgerState | null; view: L
             ) : (
               <Skeleton className="h-6 w-36 rounded-full" />
             )}
+            <a
+              href="/api/ledger/export"
+              download
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rzp-border bg-white px-2.5 text-xs font-medium text-rzp-text transition-colors hover:border-rzp-blue hover:text-rzp-blueDeep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2"
+            >
+              {t("book.export")}
+            </a>
+            {process.env.NODE_ENV === "development" ? <TamperDemoButton /> : null}
             <ViewSwitch view={view} onChange={onView} />
           </div>
         </div>
