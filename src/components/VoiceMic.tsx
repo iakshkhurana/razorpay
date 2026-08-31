@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/core";
 import { onboard } from "@/lib/i18n/strings/onboard";
+import { grantMicConsent, hasMicConsent } from "@/lib/voice/mic";
 import { cn } from "@/lib/utils";
 
 /**
@@ -65,6 +66,7 @@ export function VoiceMic({ onTranscript, disabled = false, label, className }: V
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [note, setNote] = useState<MicNote | null>(null);
+  const [askConsent, setAskConsent] = useState(false);
 
   const recognizer = useRef<RecognitionLike | null>(null);
   const finalText = useRef("");
@@ -159,13 +161,28 @@ export function VoiceMic({ onTranscript, disabled = false, label, className }: V
     }
   }, []);
 
+  /** First press asks once; the shared consent flag covers every mic on the site. */
+  const requestStart = useCallback(() => {
+    if (!hasMicConsent()) {
+      setAskConsent(true);
+      return;
+    }
+    start();
+  }, [start]);
+
+  const allowAndStart = useCallback(() => {
+    grantMicConsent();
+    setAskConsent(false);
+    start();
+  }, [start]);
+
   if (!supported || hidden) return null;
 
   return (
     <div className={cn("flex items-center gap-4", className)}>
       <button
         type="button"
-        onClick={listening ? stop : start}
+        onClick={listening ? stop : requestStart}
         disabled={disabled}
         aria-pressed={listening}
         aria-label={listening ? t("mic.stop") : t("mic.start")}
@@ -186,10 +203,30 @@ export function VoiceMic({ onTranscript, disabled = false, label, className }: V
             <p className="font-medium text-[#B3262C]">{t("mic.listening")}</p>
             {interim ? <p className="truncate text-rzp-muted">{interim}</p> : null}
           </>
+        ) : askConsent ? (
+          <div>
+            <p className="text-rzp-text">{t("mic.consent.text")}</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={allowAndStart}
+                className="rounded-sm text-sm font-semibold text-rzp-blueDeep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-1"
+              >
+                {t("mic.consent.allow")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAskConsent(false)}
+                className="rounded-sm text-sm text-rzp-muted underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-1"
+              >
+                {t("mic.consent.cancel")}
+              </button>
+            </div>
+          </div>
         ) : (
           <p className="text-rzp-muted">{label ?? t("mic.label1")}</p>
         )}
-        {note && !listening ? <p className="mt-0.5 text-xs text-[#B3262C]">{note === "noSpeech" ? t("mic.noSpeech") : t("mic.failed")}</p> : null}
+        {note && !listening && !askConsent ? <p className="mt-0.5 text-xs text-[#B3262C]">{note === "noSpeech" ? t("mic.noSpeech") : t("mic.failed")}</p> : null}
       </div>
     </div>
   );

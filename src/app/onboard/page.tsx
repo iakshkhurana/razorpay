@@ -152,6 +152,8 @@ export default function OnboardPage() {
   const [utterance, setUtterance] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [sampleLoading, setSampleLoading] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoNote, setPhotoNote] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [draftSource, setDraftSource] = useState<OnboardResponse["source"] | null>(null);
@@ -167,6 +169,7 @@ export default function OnboardPage() {
   const [live, setLive] = useState(false);
 
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const photoInput = useRef<HTMLInputElement | null>(null);
   const flashTimer = useRef<number | null>(null);
   /* mirrors `step` synchronously so a queued tour action sees a draft that has not rendered yet */
   const stepRef = useRef<Step>("catalog");
@@ -217,6 +220,38 @@ export default function OnboardPage() {
       setDraftError(null);
     } catch {
       setDraftError(tRef.current("error.file", { name: file.name }));
+    }
+  }, []);
+
+  /** A bill or price-list photo → catalog rows via the vision route; fills the CSV box. */
+  const readPhoto = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoNote({ tone: "err", text: tRef.current("photo.tooBig") });
+      return;
+    }
+    setPhotoBusy(true);
+    setPhotoNote(null);
+    setDraftError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/onboard/vision", { method: "POST", body: form });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; csv?: string; count?: number } | null;
+      if (res.status === 501) {
+        setPhotoNote({ tone: "err", text: tRef.current("photo.unavailable") });
+        return;
+      }
+      if (!res.ok || !data?.ok || typeof data.csv !== "string") {
+        setPhotoNote({ tone: "err", text: tRef.current("photo.error") });
+        return;
+      }
+      setCsv(data.csv);
+      setPhotoNote({ tone: "ok", text: tRef.current("photo.done", { count: data.count ?? 0 }) });
+    } catch {
+      setPhotoNote({ tone: "err", text: tRef.current("photo.error") });
+    } finally {
+      setPhotoBusy(false);
     }
   }, []);
 
@@ -524,6 +559,17 @@ export default function OnboardPage() {
                         {t("drop.choose")}
                       </button>
                       <span>{t("drop.text2")}</span>
+                      <span>{t("photo.or")}</span>
+                      <button
+                        type="button"
+                        onClick={() => photoInput.current?.click()}
+                        disabled={photoBusy || drafting}
+                        aria-busy={photoBusy}
+                        className="inline-flex items-center gap-1 rounded-sm font-medium text-rzp-blueDeep underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {photoBusy ? <Spinner className="h-3 w-3" /> : null}
+                        {photoBusy ? t("photo.busy") : t("photo.button")}
+                      </button>
                       <input
                         ref={fileInput}
                         type="file"
@@ -534,8 +580,23 @@ export default function OnboardPage() {
                           e.target.value = "";
                         }}
                       />
+                      <input
+                        ref={photoInput}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          void readPhoto(e.target.files?.[0]);
+                          e.target.value = "";
+                        }}
+                      />
                     </div>
                   </div>
+                  {photoNote ? (
+                    <p className={cn("mt-2 text-sm", photoNote.tone === "err" ? ERROR_TEXT : "text-rzp-text")} aria-live="polite" role={photoNote.tone === "err" ? "alert" : undefined}>
+                      {photoNote.text}
+                    </p>
+                  ) : null}
                 </div>
 
                 <VoiceMic
