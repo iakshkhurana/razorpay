@@ -25,6 +25,7 @@ import { formatINR, rupeesToPaise } from "@/lib/money";
 import type { ChatMessage, VerdictEvent } from "@/lib/schemas";
 import { isTourActive, useTourAction, type TourEventDetail } from "@/lib/tour/client";
 import { cn } from "@/lib/utils";
+import { useMicInput } from "@/lib/voice/mic";
 import { useAgentVoice, type AgentVoice } from "@/lib/voice/useAgentVoice";
 
 /* ------------------------------------------------------------------ */
@@ -552,8 +553,8 @@ export default function SimulatorPage() {
   /*  Manual turns                                                     */
   /* ---------------------------------------------------------------- */
 
-  async function sendManual() {
-    const text = draft.trim();
+  async function sendManual(textOverride?: string) {
+    const text = (textOverride ?? draft).trim();
     if (!text || running) return;
     const active = mandateRef.current;
     if (!active) {
@@ -710,6 +711,34 @@ export default function SimulatorPage() {
   /* ---------------------------------------------------------------- */
   /*  Derived                                                          */
   /* ---------------------------------------------------------------- */
+
+  /* ---------------------------------------------------------------- */
+  /*  Buyer mic: record → Sarvam STT (browser recognizer fallback)     */
+  /* ---------------------------------------------------------------- */
+
+  const [askConsent, setAskConsent] = useState(false);
+  const mic = useMicInput({
+    locale,
+    onStart: hushSeller, // barge-in: the seller stops talking the moment the buyer speaks
+    onTranscript: (text) => {
+      setDraft(text);
+      void sendManualRef.current(text);
+    },
+  });
+  const sendManualRef = useRef(sendManual);
+  sendManualRef.current = sendManual;
+
+  const onMicClick = useCallback(() => {
+    if (mic.phase !== "idle") {
+      mic.stop();
+      return;
+    }
+    if (!mic.consented) {
+      setAskConsent(true);
+      return;
+    }
+    void mic.start();
+  }, [mic]);
 
   const lastOffer = lastOfferIn(items);
   const acceptableOfferId =
@@ -953,12 +982,71 @@ export default function SimulatorPage() {
                   disabled={running}
                   autoComplete="off"
                 />
+                {mic.supported ? (
+                  <button
+                    type="button"
+                    onClick={onMicClick}
+                    disabled={running || mic.phase === "transcribing"}
+                    aria-pressed={mic.phase === "listening"}
+                    aria-label={mic.phase === "listening" ? t("mic.stop") : t("mic.start")}
+                    className={cn(
+                      "grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition-colors",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
+                      "disabled:cursor-not-allowed disabled:opacity-50",
+                      mic.phase === "listening"
+                        ? "animate-mic-pulse border-rzp-red bg-rzp-red/10 text-[#B3262C]"
+                        : "border-rzp-border bg-white text-rzp-blueDeep hover:border-rzp-blue",
+                    )}
+                  >
+                    {mic.phase === "transcribing" ? (
+                      <Spinner className="h-4 w-4" />
+                    ) : (
+                      <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect x="9" y="3" width="6" height="11" rx="3" />
+                        <path d="M5 11a7 7 0 0 0 14 0" />
+                        <path d="M12 18v3" />
+                      </svg>
+                    )}
+                  </button>
+                ) : null}
                 <Button onClick={() => void sendManual()} disabled={running || draft.trim().length === 0} className="shrink-0">
                   <SendIcon className="h-4 w-4" />
                   {t("input.send")}
                 </Button>
               </div>
-              <p className="text-[11px] text-rzp-muted">{t("input.hint")}</p>
+              {askConsent && !mic.consented ? (
+                <div className="rounded-xl border border-rzp-border bg-rzp-mist p-3 text-xs text-rzp-text" role="alertdialog" aria-label={t("consent.allow")}>
+                  <p>{t("consent.body")}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        mic.grantConsent();
+                        setAskConsent(false);
+                        void mic.start();
+                      }}
+                    >
+                      {t("consent.allow")}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setAskConsent(false)}>
+                      {t("consent.deny")}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              <p className="text-[11px] text-rzp-muted" aria-live="polite">
+                {mic.phase === "listening"
+                  ? t("mic.listening")
+                  : mic.phase === "transcribing"
+                    ? t("mic.transcribing")
+                    : mic.issue === "denied"
+                      ? t("mic.denied")
+                      : mic.issue === "noSpeech"
+                        ? t("mic.noSpeech")
+                        : mic.issue === "failed"
+                          ? t("mic.failed")
+                          : t("input.hint")}
+              </p>
             </CardContent>
           </Card>
 

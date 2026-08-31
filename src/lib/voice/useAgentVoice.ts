@@ -147,6 +147,28 @@ function playBlob(blob: Blob): Promise<boolean> {
   });
 }
 
+/** Sentence boundaries for both scripts (।, ., !, ?); short trailing fragments ride along. */
+export function splitSentences(text: string): string[] {
+  const parts = text.match(/[^.!?।]+[.!?।]+["')\]]*\s*|[^.!?।]+$/g);
+  const out = (parts ?? [text]).map((s) => s.trim()).filter(Boolean);
+  // Very short chunks (e.g. "Done.") merge forward so we do not pay a TTS round-trip for two words.
+  const merged: string[] = [];
+  for (const s of out) {
+    if (merged.length > 0 && (s.length < 12 || merged[merged.length - 1].length < 12)) merged[merged.length - 1] += ` ${s}`;
+    else merged.push(s);
+  }
+  return merged;
+}
+
+async function fetchTts(sentence: string | undefined, lang: SpeechLang): Promise<Blob | null> {
+  if (!sentence) return null;
+  try {
+    return await api.tts(sentence, lang);
+  } catch {
+    return null;
+  }
+}
+
 async function speakNow(text: string, lang: SpeechLang, myEpoch: number): Promise<void> {
   if (myEpoch !== epoch || !state.enabled) return;
   const spoken = toSpeakable(text, lang);
@@ -156,15 +178,20 @@ async function speakNow(text: string, lang: SpeechLang, myEpoch: number): Promis
   if (myEpoch !== epoch || !state.enabled) return;
 
   if (state.server === "sarvam") {
-    let blob: Blob | null = null;
-    try {
-      blob = await api.tts(spoken, lang);
-    } catch {
-      blob = null; // upstream trouble: browser voices take over
+    // Sentence-chunked pipeline: synthesize sentence i+1 while i is playing,
+    // so the first audio starts as soon as the first sentence is ready.
+    const sentences = splitSentences(spoken);
+    let playedAny = false;
+    let next: Promise<Blob | null> = fetchTts(sentences[0], lang);
+    for (let i = 0; i < sentences.length; i += 1) {
+      const blob = await next;
+      if (myEpoch !== epoch || !state.enabled) return;
+      next = i + 1 < sentences.length ? fetchTts(sentences[i + 1], lang) : Promise.resolve(null);
+      if (!blob || !(await playBlob(blob))) break;
+      playedAny = true;
+      if (myEpoch !== epoch || !state.enabled) return;
     }
-    if (myEpoch !== epoch || !state.enabled) return;
-    if (blob && (await playBlob(blob))) return;
-    if (myEpoch !== epoch || !state.enabled) return;
+    if (playedAny) return; // a mid-reply hiccup ends the line rather than restarting it in another voice
   }
   if (state.supported) await speakBrowser(spoken, lang);
 }
