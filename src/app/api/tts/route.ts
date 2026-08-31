@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { json, parseBody } from "@/lib/api";
+import { json, parseBody, rateLimit } from "@/lib/api";
 import { recordVoiceCall } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +48,8 @@ function extractAudio(data: unknown): string | null {
 }
 
 export async function POST(req: Request) {
+  const limited = rateLimit(req, "tts", 120);
+  if (limited) return limited;
   const body = await parseBody(req, TtsBodySchema);
   if (!body.ok) return body.response;
 
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
     target_language_code: lang,
     speaker: speaker ?? "priya",
     model: "bulbul:v3",
-    pace: 1.0,
+    pace: 0.95,
     speech_sample_rate: 22050,
   };
 

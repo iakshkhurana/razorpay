@@ -109,14 +109,23 @@ export function detectLang(text: string): SpeechLang {
  */
 export function toSpeakable(text: string, lang: SpeechLang): string {
   const rupee = lang === "hi-IN" ? "rupaye" : "rupees";
-  return text
-    .replace(/\p{Extended_Pictographic}/gu, " ")
-    .replace(/[️‍]/g, "")
-    .replace(/[*_`#>~]+/g, " ")
-    .replace(/₹\s?([\d,]+(?:\.\d+)?)/g, `$1 ${rupee}`)
-    .replace(/₹/g, ` ${rupee} `)
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    text
+      // never read machine noise aloud: URLs, ids, hashes
+      .replace(/\bhttps?:\/\/\S+/gi, " ")
+      .replace(/\b(?:www\.|rzp\.io\/)\S+/gi, " ")
+      .replace(/\b(?:ord|off|mnd|ses|plink|pay|mockpay|eval)_[A-Za-z0-9_-]+/g, " ")
+      .replace(/\b[0-9a-f]{12,}\b/gi, " ")
+      .replace(/\(\s*\)/g, " ")
+      .replace(/\p{Extended_Pictographic}/gu, " ")
+      .replace(/[️‍]/g, "")
+      .replace(/[*_`#>~]+/g, " ")
+      .replace(/₹\s?([\d,]+(?:\.\d+)?)/g, `$1 ${rupee}`)
+      .replace(/₹/g, ` ${rupee} `)
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+([.,!?।])/g, "$1")
+      .trim()
+  );
 }
 
 function splitLong(sentence: string, max: number): string[] {
