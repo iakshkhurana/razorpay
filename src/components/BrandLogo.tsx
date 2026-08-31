@@ -29,20 +29,35 @@ export interface BrandLogoProps {
   priority?: boolean;
 }
 
-/** The square tile. With a label it is an image; without one it is decorative (the wordmark beside it carries the name). */
+/**
+ * The mark: a gate. Two pillars, an arch, and the ledger line running through —
+ * drawn inline so it is crisp at any size and needs no image asset. With a
+ * label it is an image; without one it is decorative (the wordmark beside it
+ * carries the name).
+ */
 function MarkTile({ size, label }: { size: number; label?: string }) {
   return (
     <span
       role={label ? "img" : undefined}
       aria-label={label || undefined}
       aria-hidden={label ? undefined : true}
-      className={cn(
-        "inline-flex shrink-0 select-none items-center justify-center bg-rzp-navy font-display font-bold tracking-wide text-rzp-cyan ring-1 ring-white/10",
-        size >= 36 ? "rounded-xl" : "rounded-lg",
-      )}
-      style={{ width: size, height: size, fontSize: Math.max(10, Math.round(size * 0.34)) }}
+      className={cn("inline-flex shrink-0 select-none items-center justify-center overflow-hidden", size >= 36 ? "rounded-xl" : "rounded-lg")}
+      style={{ width: size, height: size }}
     >
-      AG
+      <svg viewBox="0 0 40 40" className="h-full w-full">
+        <defs>
+          <linearGradient id="ag-mark-bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#1B45B8" />
+            <stop offset="1" stopColor="#0B1D3A" />
+          </linearGradient>
+        </defs>
+        <rect width="40" height="40" rx={size >= 36 ? 10 : 8} fill="url(#ag-mark-bg)" />
+        {/* the gate: pillars + arch */}
+        <path d="M11 30V19c0-6 4-9.5 9-9.5s9 3.5 9 9.5v11" fill="none" stroke="#2EC4E6" strokeWidth="2.6" strokeLinecap="round" />
+        {/* the ledger line through the gate */}
+        <path d="M8 30h24" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M16 24.5h8" stroke="#7FDBEE" strokeWidth="2" strokeLinecap="round" />
+      </svg>
     </span>
   );
 }

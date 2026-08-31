@@ -14,7 +14,7 @@ export const common = dict({
     "brand.name": "AgentGate",
     "brand.tagline": "Har paisa, likha hua.",
     "brand.sub": "Every rupee your AI sells — explained, bounded, and written down.",
-    "brand.hackathon": "Razorpay Hackathon · Track 01",
+    "brand.hackathon": "Agentic commerce, guarded",
 
     /* marketing nav */
     "nav.product": "Product",
@@ -166,7 +166,7 @@ export const common = dict({
     "footer.resources": "Resources",
     "footer.company": "Company",
     "footer.legal": "Legal",
-    "footer.builtFor": "Built for the Razorpay Hackathon · Track 01",
+    "footer.builtFor": "Built in India · on Razorpay test rails",
     "footer.testModeNote": "Runs on Razorpay test rails. No real money moves.",
     "footer.copyright": "© {{year}} AgentGate. All rights reserved.",
     "footer.madeIn": "Made in India",
@@ -193,7 +193,7 @@ export const common = dict({
     "brand.name": "AgentGate",
     "brand.tagline": "हर पैसा, लिखा हुआ।",
     "brand.sub": "आपका AI जो भी रुपया बेचे — समझाया हुआ, सीमा में, और लिखा हुआ।",
-    "brand.hackathon": "Razorpay Hackathon · Track 01",
+    "brand.hackathon": "एजेंटिक कॉमर्स, सुरक्षित",
 
     /* marketing nav */
     "nav.product": "प्रोडक्ट",
@@ -345,7 +345,7 @@ export const common = dict({
     "footer.resources": "संसाधन",
     "footer.company": "कंपनी",
     "footer.legal": "कानूनी",
-    "footer.builtFor": "Razorpay Hackathon · Track 01 के लिए बनाया गया",
+    "footer.builtFor": "भारत में बना · Razorpay टेस्ट रेल्स पर",
     "footer.testModeNote": "Razorpay टेस्ट रेल्स पर चलता है। असली पैसा नहीं चलता।",
     "footer.copyright": "© {{year}} AgentGate. सर्वाधिकार सुरक्षित।",
     "footer.madeIn": "भारत में बनाया गया",

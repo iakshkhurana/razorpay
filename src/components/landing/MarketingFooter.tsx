@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
 import { REPO_URL } from "./MarketingHeader";
 
 interface FooterLink {
@@ -19,7 +20,7 @@ const COLUMNS: readonly FooterColumn[] = [
       { label: "Onboard a shop", href: "/onboard" },
       { label: "Buyer simulator", href: "/simulator" },
       { label: "Control Tower", href: "/dashboard" },
-      { label: "Evidence", href: "/eval" },
+      { label: "Pricing", href: "/pricing" },
     ],
   },
   {
@@ -37,60 +38,73 @@ const COLUMNS: readonly FooterColumn[] = [
       { label: "Scorecard", href: "/eval" },
       { label: "Red team: 40 attacks", href: "/eval" },
       { label: "Ledger integrity", href: "/dashboard" },
-      { label: "Results table", href: `${REPO_URL}#readme`, external: true },
+      { label: "Metrics", href: "/metrics" },
     ],
   },
   {
-    title: "Repo",
+    title: "Build",
     links: [
+      { label: "Developers", href: "/developers" },
       { label: "GitHub", href: REPO_URL, external: true },
       { label: "README", href: `${REPO_URL}#readme`, external: true },
       { label: "MCP server", href: `${REPO_URL}/blob/HEAD/mcp/server.ts`, external: true },
-      { label: "Issues", href: `${REPO_URL}/issues`, external: true },
     ],
   },
 ];
 
 const LINK =
-  "inline-block rounded-sm text-sm text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 focus-visible:ring-offset-rzp-navy";
+  "group inline-block rounded-sm text-sm text-white/60 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-rzp-navy";
 
 function FooterAnchor({ link }: { link: FooterLink }) {
+  const inner = (
+    <>
+      <span className="bg-gradient-to-r from-rzp-cyan to-rzp-cyan bg-[length:0%_1px] bg-left-bottom bg-no-repeat pb-0.5 transition-[background-size] duration-200 group-hover:bg-[length:100%_1px]">
+        {link.label}
+      </span>
+      {link.external ? <span className="sr-only"> (opens in a new tab)</span> : null}
+    </>
+  );
   if (link.external) {
     return (
       <a href={link.href} className={LINK} target="_blank" rel="noreferrer noopener">
-        {link.label}
-        <span className="sr-only"> (opens in a new tab)</span>
+        {inner}
       </a>
     );
   }
   return (
     <Link href={link.href} className={LINK}>
-      {link.label}
+      {inner}
     </Link>
   );
 }
 
+/**
+ * The dark closing act: gradient navy, a hairline of teal light on top, the
+ * link columns, and the AgentGate watermark rising out of the darkness at
+ * the very end of the page.
+ */
 export function MarketingFooter() {
   return (
-    <footer className="bg-rzp-navy text-white">
-      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+    <footer className="relative overflow-hidden text-white" style={{ background: "linear-gradient(180deg, #0E2247 0%, #0B1D3A 34%, #060F22 100%)" }}>
+      {/* hairline glow along the top edge */}
+      <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(46,196,230,0.55), transparent)" }} />
+      <div aria-hidden="true" className="pointer-events-none absolute -top-24 left-1/2 h-64 w-[42rem] -translate-x-1/2 rounded-full" style={{ background: "radial-gradient(closest-side, rgba(47,107,255,0.22), transparent)" }} />
+
+      <div className="relative mx-auto max-w-6xl px-4 pb-10 pt-16 sm:px-6">
         <div className="grid gap-10 lg:grid-cols-[1.3fr_repeat(4,minmax(0,1fr))]">
           <div className="max-w-sm">
-            <p className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-                <rect x="2" y="2" width="20" height="20" rx="6" fill="#3395FF" />
-                <path d="M7 16.5 12 6l5 10.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M9.2 13h5.6" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              AgentGate
+            <BrandLogo variant="onDark" size={30} href={null} />
+            <p className="mt-5 font-display text-2xl font-semibold tracking-tight">Har paisa, likha hua.</p>
+            <p className="mt-2 text-sm leading-relaxed text-white/60">Every rupee your AI sells — explained, bounded, and written down.</p>
+            <p className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-rzp-green" aria-hidden="true" />
+              Razorpay test rails · the LLM never touches money
             </p>
-            <p className="mt-4 font-display text-2xl font-semibold tracking-tight">Har paisa, likha hua.</p>
-            <p className="mt-2 text-sm leading-relaxed text-white/70">Every rupee your AI sells — explained, bounded, and written down.</p>
           </div>
 
           {COLUMNS.map((col) => (
             <nav key={col.title} aria-labelledby={`footer-${col.title.toLowerCase()}`}>
-              <h2 id={`footer-${col.title.toLowerCase()}`} className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
+              <h2 id={`footer-${col.title.toLowerCase()}`} className="text-xs font-semibold uppercase tracking-[0.16em] text-rzp-cyan/70">
                 {col.title}
               </h2>
               <ul className="mt-4 space-y-2.5">
@@ -104,10 +118,26 @@ export function MarketingFooter() {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-white/60 sm:flex-row sm:items-center sm:justify-between">
-          <p>Built for Razorpay Hackathon · Track 01</p>
-          <p>Test-mode rails only. The LLM never touches money.</p>
+        <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-white/50 sm:flex-row sm:items-center sm:justify-between">
+          <p>© AgentGate · built in India</p>
+          <p>Test-mode rails only.</p>
         </div>
+      </div>
+
+      {/* the watermark rises out of the dark */}
+      <div aria-hidden="true" className="relative select-none overflow-hidden px-2 pt-4">
+        <p
+          className="whitespace-nowrap text-center font-display font-bold uppercase leading-[0.78] tracking-tight text-transparent"
+          style={{
+            fontSize: "17.5vw",
+            marginBottom: "-0.24em",
+            backgroundImage: "linear-gradient(180deg, rgba(127,181,255,0.5) 0%, rgba(47,107,255,0.22) 45%, rgba(6,15,34,0) 92%)",
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+          }}
+        >
+          AgentGate
+        </p>
       </div>
     </footer>
   );

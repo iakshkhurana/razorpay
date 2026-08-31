@@ -396,20 +396,6 @@ export default function LandingPage() {
       </section>
 
       <MarketingFooter />
-      <div className="overflow-hidden bg-white px-4 pt-6" aria-hidden="true">
-        <p
-          className="select-none whitespace-nowrap text-center font-display font-bold uppercase leading-[0.8] tracking-tight text-transparent"
-          style={{
-            fontSize: "18vw",
-            marginBottom: "-0.22em",
-            backgroundImage: "linear-gradient(180deg, #2F6BFF 0%, #A9CCFF 55%, #FFFFFF 100%)",
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-          }}
-        >
-          AgentGate
-        </p>
-      </div>
     </div>
   );
 }

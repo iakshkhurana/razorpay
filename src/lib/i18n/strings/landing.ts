@@ -12,7 +12,7 @@ import { dict } from "../core";
 export const landing = dict({
   en: {
     /* hero */
-    "hero.eyebrow": "India's agentic-commerce gate · Razorpay Hackathon Track 01",
+    "hero.eyebrow": "India's agentic-commerce gate · on Razorpay rails",
     "hero.title": "Har paisa, likha hua.",
     "hero.sub": "Every rupee your AI sells — explained, bounded, and written down.",
     "hero.ctaOnboard": "Onboard a shop",
@@ -220,14 +220,14 @@ export const landing = dict({
     "footer.link.api": "API reference",
     "footer.link.mcp": "MCP server",
     "footer.link.github": "GitHub",
-    "footer.builtFor": "Built for Razorpay Hackathon · Track 01",
+    "footer.builtFor": "Built in India · runs on Razorpay test rails",
     "footer.rails": "Test-mode rails only. The LLM never touches money.",
     "footer.language": "Language",
     "footer.newTab": "(opens in a new tab)",
   },
   hi: {
     /* hero */
-    "hero.eyebrow": "भारत का एजेंटिक-कॉमर्स गेट · Razorpay Hackathon Track 01",
+    "hero.eyebrow": "भारत का एजेंटिक-कॉमर्स गेट · Razorpay रेल्स पर",
     "hero.title": "हर पैसा, लिखा हुआ।",
     "hero.sub": "आपका AI जो भी रुपया बेचे — समझाया हुआ, सीमा में, और लिखा हुआ।",
     "hero.ctaOnboard": "दुकान जोड़ें",
@@ -435,7 +435,7 @@ export const landing = dict({
     "footer.link.api": "API संदर्भ",
     "footer.link.mcp": "MCP सर्वर",
     "footer.link.github": "GitHub",
-    "footer.builtFor": "Razorpay Hackathon · Track 01 के लिए बनाया गया",
+    "footer.builtFor": "भारत में बना · Razorpay टेस्ट रेल्स पर",
     "footer.rails": "सिर्फ़ टेस्ट-मोड रेल्स। LLM कभी पैसे को नहीं छूता।",
     "footer.language": "भाषा",
     "footer.newTab": "(नए टैब में खुलता है)",

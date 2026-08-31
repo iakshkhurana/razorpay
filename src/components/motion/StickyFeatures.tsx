@@ -59,8 +59,8 @@ function StackPanel({ item, index, count, progress }: PanelProps) {
   const outEnd = outStart + SLIDE_SHARE * slice;
 
   const y = useTransform(progress, [inStart, inEnd], first ? ["0%", "0%"] : ["106%", "0%"]);
-  const scale = useTransform(progress, [outStart, outEnd], last ? [1, 1] : [1, 0.94]);
-  const dim = useTransform(progress, [outStart, outEnd], last ? [0, 0] : [0, 0.32]);
+  const scale = useTransform(progress, [outStart, outEnd], last ? [1, 1] : [1, 0.9]);
+  const dim = useTransform(progress, [outStart, outEnd], last ? [0, 0] : [0, 0.65]);
   const accent = ACCENTS[item.accent ?? "blue"];
 
   return (
@@ -80,7 +80,7 @@ function StackPanel({ item, index, count, progress }: PanelProps) {
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent.dot }} aria-hidden="true" />
             {item.eyebrow}
           </p>
-          <h3 id={`${item.id}-title`} className="font-display text-2xl font-bold tracking-tight text-[#0B1D3A] sm:text-3xl xl:text-4xl">
+          <h3 id={`${item.id}-title`} className="font-display text-2xl font-bold leading-tight tracking-tight text-[#0B1D3A] sm:text-3xl">
             {item.title}
           </h3>
           <p className="text-sm leading-relaxed text-[#5B6B8C] sm:text-base">{item.body}</p>
@@ -197,7 +197,7 @@ export function StickyFeatures({ items, railLabel = "Features", className }: Sti
               </LayoutGroup>
             </nav>
 
-            <div className="space-y-6 lg:motion-safe:relative lg:motion-safe:h-[min(72vh,640px)] lg:motion-safe:space-y-0">
+            <div className="space-y-6 lg:motion-safe:relative lg:motion-safe:h-[min(78vh,700px)] lg:motion-safe:space-y-0">
               {items.map((item, i) => (
                 <StackPanel key={item.id} item={item} index={i} count={count} progress={scrollYProgress} />
               ))}

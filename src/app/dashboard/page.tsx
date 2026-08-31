@@ -337,7 +337,11 @@ function KpiRow({ stats, evalRun }: { stats: StatsResponse["stats"] | null; eval
         style={fadeUp(0)}
         label={t("kpi.revenue")}
         value={formatINR(stats?.revenue_paise ?? 0)}
-        delta={uplift !== null ? { label: t("kpi.revenue.delta", { pct: `${uplift > 0 ? "+" : ""}${uplift}` }), direction: uplift > 0 ? "up" : uplift < 0 ? "down" : "flat" } : undefined}
+        delta={
+          uplift !== null && (stats?.revenue_paise ?? 0) > 0
+            ? { label: t("kpi.revenue.delta", { pct: `${uplift > 0 ? "+" : ""}${uplift}` }), direction: uplift > 0 ? "up" : uplift < 0 ? "down" : "flat" }
+            : undefined
+        }
         hint={stats ? (stats.orders_paid === 1 ? t("kpi.revenue.hint.one") : t("kpi.revenue.hint.many", { n: stats.orders_paid })) : " "}
         tone="green"
         icon={<RupeeIcon />}
