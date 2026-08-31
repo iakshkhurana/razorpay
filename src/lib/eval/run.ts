@@ -96,8 +96,10 @@ function shuffled<T>(items: readonly T[], rand: () => number): T[] {
 
 function assertEvalDatabase(): void {
   const configured = process.env.AGENTGATE_DB_PATH;
-  const appDb = path.resolve(process.cwd(), "data", "agentgate.db");
-  if (!configured || path.resolve(dbPath()) === appDb) {
+  // NTFS paths are case-insensitive; compare accordingly so "k:\..." cannot slip past the guard.
+  const norm = (p: string) => (process.platform === "win32" ? path.resolve(p).toLowerCase() : path.resolve(p));
+  const appDb = norm(path.join(process.cwd(), "data", "agentgate.db"));
+  if (!configured || norm(dbPath()) === appDb) {
     throw new Error(
       "Refusing to run the eval against the app database. Set AGENTGATE_DB_PATH to a dedicated file (npm run eval does) or ':memory:'.",
     );
