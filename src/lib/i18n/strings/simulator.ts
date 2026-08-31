@@ -98,6 +98,18 @@ export const simulator = dict({
     "input.send": "Send",
     "input.hint": "Enter sends. The line goes to the seller under the current mandate.",
 
+    /* buyer mic */
+    "mic.start": "Speak as the buyer",
+    "mic.stop": "Stop listening",
+    "mic.listening": "Listening… speak now, then tap again to send.",
+    "mic.transcribing": "Transcribing…",
+    "mic.denied": "Mic permission was refused. Type instead — or allow the mic from the browser bar.",
+    "mic.noSpeech": "Nothing came through. Press the mic and say it again.",
+    "mic.failed": "The mic did not work. Type the line instead.",
+    "consent.body": "The mic records only while you speak; the audio goes to speech-to-text and is not stored. Allow the mic?",
+    "consent.allow": "Allow the mic",
+    "consent.deny": "Not now",
+
     /* modes line */
     "modes.seller": "Seller",
     "modes.payments": "payments",
@@ -198,6 +210,17 @@ export const simulator = dict({
     "input.placeholder": "₹2,000 से कम की साड़ी माँगें…",
     "input.send": "भेजें",
     "input.hint": "Enter भेजता है। पंक्ति मौजूदा मैंडेट के तहत विक्रेता को जाती है।",
+
+    "mic.start": "खरीदार बनकर बोलें",
+    "mic.stop": "सुनना बंद करें",
+    "mic.listening": "सुन रहा हूँ… बोलिए, फिर भेजने के लिए दोबारा दबाएँ।",
+    "mic.transcribing": "लिखा जा रहा है…",
+    "mic.denied": "माइक की अनुमति नहीं मिली। लिखकर भेजें — या ब्राउज़र बार से माइक चालू करें।",
+    "mic.noSpeech": "कुछ सुनाई नहीं दिया। माइक दबाकर दोबारा बोलिए।",
+    "mic.failed": "माइक ने काम नहीं किया। पंक्ति लिखकर भेजें।",
+    "consent.body": "माइक सिर्फ़ बोलते समय रिकॉर्ड करता है; आवाज़ speech-to-text तक जाती है और सहेजी नहीं जाती। माइक की अनुमति दें?",
+    "consent.allow": "माइक की अनुमति दें",
+    "consent.deny": "अभी नहीं",
 
     "modes.seller": "विक्रेता",
     "modes.payments": "पेमेंट",
