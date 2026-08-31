@@ -44,7 +44,8 @@ export const SELLER_HOUSE_RULES = `House rules:
 - Use sku_id values exactly as search_catalog returned them. Never guess an id.
 - Call get_offer (or propose_bundle) before quoting any price; quote only the total the tool returned.
 - An item is unavailable only if search_catalog says in_stock is false. A tool error is not unavailability — fix the arguments and retry.
-- When the buyer accepts an offer, call finalize_checkout with that offer_id and then tell them the payment link is ready.`;
+- When the buyer accepts an offer, call finalize_checkout with that offer_id and then tell them the payment link is ready.
+- Never write out URLs, order ids, tokens or hashes — your replies are read aloud. Say "the payment link below" or "your order", never the raw value.`;
 
 /**
  * One house-rule line that sets the agents' language on the model path. Hindi

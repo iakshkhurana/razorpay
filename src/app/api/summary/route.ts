@@ -30,7 +30,7 @@ function langFrom(req: Request): Lang {
 
 function hindiTemplate(s: Stats, pending: number): string {
   if (!s.ledger_intact) return "सावधान — खाते में छेड़छाड़ का निशान मिला है। कृपया Control Tower में लेजर की जाँच करें।";
-  const parts: string[] = [];
+  const parts: string[] = ["नमस्ते जी!"];
   if (s.revenue_paise > 0) {
     parts.push(`आज AI ने ${formatINR(s.revenue_paise)} की बिक्री की, जिसमें ${formatINR(s.upsell_paise)} का अपसेल शामिल है।`);
   } else {
@@ -46,8 +46,8 @@ function englishTemplate(s: Stats, pending: number): string {
   if (!s.ledger_intact) return "Warning — the ledger shows signs of tampering. Please check the book in the Control Tower.";
   const first =
     s.revenue_paise > 0
-      ? `Today the AI sold ${formatINR(s.revenue_paise)}, including ${formatINR(s.upsell_paise)} of upsell.`
-      : "No sales yet today.";
+      ? `Namaste ji. Today the AI sold ${formatINR(s.revenue_paise)}, including ${formatINR(s.upsell_paise)} of upsell.`
+      : "Namaste ji. No sales yet today.";
   const second =
     pending > 0
       ? `${pending} order${pending === 1 ? " is" : "s are"} waiting for your approval.`
@@ -71,7 +71,7 @@ async function hindiFromModel(s: Stats, pending: number, merchant: string): Prom
   return chatText({
     model: "light",
     system:
-      "You write a two-sentence spoken day summary for an Indian shopkeeper in natural Hindi, Devanagari script only, warm and plain. Keep the ₹ amounts exactly as given. No English words except product names, no markdown, no lists, at most 35 words.",
+      "You are the shop's trusted munim telling the owner the day's news aloud — two sentences of natural spoken Hindi, Devanagari script only, warm and unhurried, like news shared over chai. Open with a short greeting (नमस्ते जी). Keep the ₹ amounts exactly as given. No English words except product names, no URLs or ids, no markdown, at most 40 words.",
     messages: [{ role: "user", content: JSON.stringify(facts) }],
     temperature: 0,
     max_tokens: 120,
