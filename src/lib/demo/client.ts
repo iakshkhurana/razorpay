@@ -164,6 +164,36 @@ export interface BuyerTurnResponse {
   mode: "openai" | "fallback";
 }
 
+export interface MetricEntry {
+  id: number;
+  ts: string;
+  route: string;
+  duration_ms: number;
+  lang?: string;
+  mode?: string;
+  llm_calls: Array<{ model: string; duration_ms: number; prompt_tokens: number; completion_tokens: number }>;
+  tools: Array<{ name: string; duration_ms: number }>;
+  voice_ms?: number;
+  chars?: number;
+  ok: boolean;
+  est_cost_paise: number;
+}
+
+export interface MetricsResponse {
+  ok: true;
+  summary: {
+    turns: number;
+    avg_turn_ms: number | null;
+    avg_first_llm_ms: number | null;
+    avg_tts_ms: number | null;
+    total_prompt_tokens: number;
+    total_completion_tokens: number;
+    est_cost_paise: number;
+  };
+  entries: MetricEntry[];
+  note: string;
+}
+
 /** The spoken day summary: `text` is the primary in `lang`; both languages always come back. */
 export interface SummaryResponse {
   ok: true;
@@ -214,6 +244,9 @@ export const api = {
 
   /** Day summary for the voice button. `lang` picks the primary text; pass it straight to `speak(res.text)`. */
   summary: (lang: Lang = "en") => call<SummaryResponse>(`/api/summary?lang=${lang}`),
+
+  /** Demo metrics: latency, tokens, tools and estimated cost per request. */
+  metrics: () => call<MetricsResponse>("/api/metrics"),
 
   /** Server-side speech (Sarvam). Resolves null when the server has no provider (404) — speak with the browser instead. */
   tts: async (text: string, lang: TtsLang, speaker?: string): Promise<Blob | null> => {
