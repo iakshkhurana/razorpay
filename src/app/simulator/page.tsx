@@ -292,6 +292,31 @@ export default function SimulatorPage() {
     }
   }, []);
 
+  /** After a PAID order, the embedding search proposes one related in-scope item as a follow-up chip. */
+  const suggestedRef = useRef<Set<string>>(new Set());
+  const suggestNext = useCallback(
+    async (order: OrderCard) => {
+      if (suggestedRef.current.has(order.id) || order.sku_names.length === 0) return;
+      suggestedRef.current.add(order.id);
+      try {
+        const res = await fetch(`/api/agent/discover?q=${encodeURIComponent(order.sku_names[0])}&k=6`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { results?: Array<{ sku: { name: string; price_paise: number }; sellable: boolean }> };
+        const bought = new Set(order.sku_names);
+        const hit = data.results?.find((r) => r.sellable && !bought.has(r.sku.name));
+        if (!hit) return;
+        const query = localeRef.current === "hi" ? `मुझे ${hit.sku.name} के बारे में बताइए` : `Tell me about the ${hit.sku.name}`;
+        setItems((prev) => [
+          ...prev,
+          { id: nextId("g"), kind: "suggest", text: tRef.current("suggest.prefix", { name: hit.sku.name, price: formatINR(hit.sku.price_paise) }), query },
+        ]);
+      } catch {
+        /* the suggestion is decoration; the paid order already stands */
+      }
+    },
+    [nextId],
+  );
+
   const startPolling = useCallback(
     (orderId: string) => {
       stopPolling();
@@ -304,10 +329,12 @@ export default function SimulatorPage() {
           const { order } = await api.order(orderId);
           failures = 0;
           setPollError(null);
-          updateOrder(toOrderCard(order));
+          const card = toOrderCard(order);
+          updateOrder(card);
           if (order.status === "PAID") {
             stopPolling();
             void celebrate(orderId);
+            void suggestNext(card);
           } else if (order.status === "REJECTED") {
             stopPolling();
           }
@@ -323,7 +350,7 @@ export default function SimulatorPage() {
       const timeout = window.setTimeout(() => stopPolling(), POLL_TIMEOUT_MS);
       pollRef.current = { interval, timeout };
     },
-    [celebrate, stopPolling, updateOrder],
+    [celebrate, stopPolling, suggestNext, updateOrder],
   );
 
   useEffect(() => stopPolling, [stopPolling]);
@@ -463,16 +490,18 @@ export default function SimulatorPage() {
       try {
         const res = await api.simulateWebhook({ order_id: orderId, outcome });
         if (gen !== genRef.current) return;
-        updateOrder(toOrderCard(res.order));
+        const card = toOrderCard(res.order);
+        updateOrder(card);
         if (res.order.status === "PAID") {
           stopPolling();
           void celebrate(orderId);
+          void suggestNext(card);
         }
       } catch (err) {
         if (gen === genRef.current) addNote(describeError(err, tRef.current("note.offline")), "deny");
       }
     },
-    [addNote, celebrate, stopPolling, updateOrder],
+    [addNote, celebrate, stopPolling, suggestNext, updateOrder],
   );
 
   /* ---------------------------------------------------------------- */
@@ -770,6 +799,7 @@ export default function SimulatorPage() {
             acceptableOfferId={acceptableOfferId}
             accepting={accepting}
             onAcceptOffer={(offer) => void acceptOffer(offer)}
+            onSuggest={(query) => void sendManual(query)}
             sellerName={merchantName}
             sellerMode={shownSellerMode}
             paymentsMode={modes?.payments ?? null}

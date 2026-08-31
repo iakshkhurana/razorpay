@@ -49,7 +49,8 @@ export type ChatItem =
   | { id: string; kind: "buyer"; text: string }
   | { id: string; kind: "seller"; text: string; events: VerdictEvent[]; offer: ChatOffer | null; citations?: ChatCitation[] }
   | { id: string; kind: "order"; order: OrderCard }
-  | { id: string; kind: "note"; text: string; tone: NoteTone };
+  | { id: string; kind: "note"; text: string; tone: NoteTone }
+  | { id: string; kind: "suggest"; text: string; query: string };
 
 /** Builds a card from either the bare order in a negotiate reply or the fuller order view. */
 export function toOrderCard(order: Order | OrderView): OrderCard {
@@ -87,6 +88,16 @@ function StoreGlyph({ className }: { className?: string }) {
       <path d="M5 12.5V20h14v-7.5" />
       <path d="M8.5 20v-5h4v5" />
       <rect x="14" y="14.5" width="2.8" height="2.4" rx="0.6" />
+    </svg>
+  );
+}
+
+/** Tiny spark for the proactive-suggestion chip. */
+function SparkMiniIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 18.3l-1.8-5.7L4.5 10.8 10.2 9Z" />
+      <path d="M18.5 16.5v4M16.5 18.5h4" />
     </svg>
   );
 }
@@ -347,6 +358,8 @@ export interface ChatPaneProps {
   acceptableOfferId?: string | null;
   accepting?: boolean;
   onAcceptOffer?: (offer: ChatOffer) => void;
+  /** a proactive follow-up chip was clicked; receives the buyer message to send */
+  onSuggest?: (query: string) => void;
   className?: string;
   /** merchant shown in the header and on order cards */
   sellerName?: string | null;
@@ -377,6 +390,7 @@ export function ChatPane({
   acceptableOfferId = null,
   accepting = false,
   onAcceptOffer,
+  onSuggest,
   className,
   sellerName,
   sellerMode = null,
@@ -444,7 +458,12 @@ export function ChatPane({
                 <li key={item.id} className="flex animate-write-in items-start gap-2.5">
                   <SellerAvatar size="sm" className="mt-5" />
                   <div className="flex min-w-0 max-w-[88%] flex-col items-start">
-                    <span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">{t("chat.seller")}</span>
+                    <span className="mb-1 flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">{t("chat.seller")}</span>
+                      <span className="rounded-full border border-rzp-blue/30 bg-rzp-blue/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.12em] text-rzp-blueDeep">
+                        {t("chat.ai")}
+                      </span>
+                    </span>
                     <div className="rounded-2xl rounded-bl-md border border-rzp-border bg-white px-4 py-3 text-sm text-rzp-text shadow-sm">
                       <p className="leading-relaxed">{item.text}</p>
                       {item.citations && item.citations.length > 0 ? (
@@ -475,6 +494,25 @@ export function ChatPane({
               return (
                 <li key={item.id} className="flex animate-write-in flex-col items-start pl-0 sm:pl-9">
                   <OrderCardView order={item.order} sellerName={merchant} paymentsMode={paymentsMode} />
+                </li>
+              );
+            }
+            if (item.kind === "suggest") {
+              return (
+                <li key={item.id} className="flex animate-write-in justify-center px-2 py-1">
+                  <button
+                    type="button"
+                    onClick={() => onSuggest?.(item.query)}
+                    disabled={busy || !onSuggest}
+                    className={cn(
+                      "inline-flex max-w-[92%] items-center gap-2 rounded-full border border-rzp-blue/30 bg-rzp-ice px-3.5 py-1.5 text-xs font-medium text-rzp-blueDeep transition-colors hover:bg-rzp-blue/10 disabled:opacity-60",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
+                    )}
+                  >
+                    <SparkMiniIcon />
+                    <span className="truncate">{item.text}</span>
+                    <span className="shrink-0 font-semibold">{t("suggest.cta")} →</span>
+                  </button>
                 </li>
               );
             }

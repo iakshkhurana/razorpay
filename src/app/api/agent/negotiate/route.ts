@@ -1,4 +1,4 @@
-import { json, parseBody, requireMandate } from "@/lib/api";
+import { json, parseBody, rateLimit, requireMandate } from "@/lib/api";
 import { loadSession, sellerTurn } from "@/lib/llm/seller";
 import { beginTurn, endTurn } from "@/lib/metrics";
 import { NegotiateRequestSchema } from "@/lib/schemas";
@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 /** One buyer message → one seller reply. Every price inside came through the policy engine. */
 export async function POST(req: Request) {
+  const limited = rateLimit(req, "chat", 30);
+  if (limited) return limited;
   const body = await parseBody(req, NegotiateRequestSchema);
   if (!body.ok) return body.response;
 

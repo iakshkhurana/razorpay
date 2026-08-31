@@ -84,3 +84,49 @@ export function bearerToken(req: Request): string | null {
 export function isDev(): boolean {
   return process.env.NODE_ENV !== "production" || process.env.AGENTGATE_ALLOW_DEV_ROUTES === "1";
 }
+
+/* ------------------------------------------------------------------ */
+/*  Rate limiting (fixed window, in-process)                           */
+/* ------------------------------------------------------------------ */
+
+interface RateWindow {
+  count: number;
+  resetAt: number;
+}
+
+/** Next bundles routes separately, so the buckets live on globalThis — one limiter for the whole server. */
+const rateStore = (globalThis as typeof globalThis & { __agentgateRate?: Map<string, RateWindow> }).__agentgateRate ??= new Map<string, RateWindow>();
+(globalThis as typeof globalThis & { __agentgateRate?: Map<string, RateWindow> }).__agentgateRate = rateStore;
+
+function clientOf(req: Request): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+}
+
+/**
+ * Fixed-window limiter per client+bucket. Returns a 429 response when the
+ * window is spent, null otherwise. In-process by design: one server, demo
+ * scale — the point is that no client can hammer the chat or voice routes.
+ */
+export function rateLimit(req: Request, bucket: string, limit: number, windowMs = 60_000): NextResponse | null {
+  const key = `${bucket}:${clientOf(req)}`;
+  const now = Date.now();
+  const w = rateStore.get(key);
+  if (!w || now >= w.resetAt) {
+    rateStore.set(key, { count: 1, resetAt: now + windowMs });
+    return null;
+  }
+  if (w.count >= limit) {
+    const retryS = Math.max(1, Math.ceil((w.resetAt - now) / 1000));
+    return NextResponse.json(
+      { ok: false, error: `Too many requests. Try again in ${retryS}s.` },
+      { status: 429, headers: { "retry-after": String(retryS) } },
+    );
+  }
+  w.count += 1;
+  return null;
+}
+
+/** Test helper. */
+export function _resetRateLimits(): void {
+  rateStore.clear();
+}
