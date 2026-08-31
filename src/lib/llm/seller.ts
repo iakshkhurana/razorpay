@@ -14,6 +14,7 @@ import {
   type VerdictEvent,
 } from "../schemas";
 import { findBundleAddon, searchCatalog } from "../search";
+import { answerShopInfo, isShopQuestion, type ShopChunk } from "../shopinfo";
 import { activePolicy, checkout, makeOffer, merchantName, type OfferResult } from "../storefront";
 import {
   detectBuyerIntent,
@@ -177,6 +178,8 @@ export interface SellerTurnResult {
   mode: "openai" | "fallback";
   session: SessionState;
   injection_signals: string[];
+  /** sources behind a shop-info answer (rulebook/catalog); empty for money turns */
+  citations: ShopChunk[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -244,7 +247,7 @@ async function deterministicTurn(input: SellerTurnInput): Promise<SellerTurnResu
   let order: Order | null = null;
   let hits = await searchCatalog(message, 5);
 
-  const finish = (text: string): SellerTurnResult => {
+  const finish = (text: string, citations: ShopChunk[] = []): SellerTurnResult => {
     const next: SessionState = {
       ...session,
       messages: [...session.messages, { role: "seller", content: text }],
@@ -252,8 +255,15 @@ async function deterministicTurn(input: SellerTurnInput): Promise<SellerTurnResu
       anchor_sku_id: offerResult?.offer.sku_ids[0] ?? session.anchor_sku_id,
     };
     persistSession(next);
-    return { reply: text, events, offer: offerResult?.offer ?? null, order, mode: "fallback", session: next, injection_signals: signals };
+    return { reply: text, events, offer: offerResult?.offer ?? null, order, mode: "fallback", session: next, injection_signals: signals, citations };
   };
+
+  // 0. A question about the shop itself (returns, rules, delivery) is not a
+  //    money action: answer it verbatim from the rulebook, with the source.
+  if (intent !== "accept" && isShopQuestion(message)) {
+    const info = answerShopInfo(message);
+    if (info.answer) return finish(info.answer, info.citations);
+  }
 
   // 1. The buyer accepts a live ALLOW/GATE offer → checkout.
   if (intent === "accept" && lastOffer && (lastOffer.verdict.decision === "ALLOW" || lastOffer.verdict.decision === "GATE")) {
@@ -459,6 +469,15 @@ const TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "shop_info",
+      description:
+        "Look up the shop's own rulebook and catalog text: returns, discount rules, order limits, categories, product details. Answer ONLY from the chunks returned and name the source; if nothing fits, say you do not know.",
+      parameters: { type: "object", properties: { question: { type: "string" } }, required: ["question"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "finalize_checkout",
       description: "Check out an offer the buyer accepted. Returns the order status and payment link.",
       parameters: { type: "object", properties: { offer_id: { type: "string" } }, required: ["offer_id"] },
@@ -491,7 +510,7 @@ async function runTool(
   input: SellerTurnInput,
   session: SessionState,
   events: VerdictEvent[],
-  sink: { offer: Offer | null; order: Order | null },
+  sink: { offer: Offer | null; order: Order | null; citations: ShopChunk[] },
 ): Promise<unknown> {
   let args: unknown;
   try {
@@ -539,6 +558,14 @@ async function runTool(
     session.anchor_sku_id = r.offer.sku_ids[0];
     return offerPayload(r);
   }
+  if (name === "shop_info") {
+    const a = SearchArgs.safeParse(typeof args === "object" && args !== null && "question" in args ? { query: (args as { question: unknown }).question } : args);
+    if (!a.success) return { error: "question is required" };
+    const info = answerShopInfo(a.data.query);
+    sink.citations.push(...info.citations);
+    if (info.chunks.length === 0) return { chunks: [], note: "Nothing in the rulebook or catalog matches. Say you do not know." };
+    return { chunks: info.chunks.map((c) => ({ source: c.source, text: c.text })) };
+  }
   if (name === "finalize_checkout") {
     const a = CheckoutArgs.safeParse(args);
     if (!a.success) return { error: "offer_id is required" };
@@ -563,7 +590,7 @@ function toOpenAIHistory(messages: ChatMessage[]): OpenAI.ChatCompletionMessageP
 async function llmTurn(input: SellerTurnInput): Promise<SellerTurnResult | null> {
   const session: SessionState = { ...input.session, messages: [...input.session.messages, { role: "buyer", content: input.message }] };
   const events: VerdictEvent[] = [];
-  const sink: { offer: Offer | null; order: Order | null } = { offer: null, order: null };
+  const sink: { offer: Offer | null; order: Order | null; citations: ShopChunk[] } = { offer: null, order: null, citations: [] };
   const signals = injectionSignals(input.message);
   const history: OpenAI.ChatCompletionMessageParam[] = toOpenAIHistory(session.messages);
   const system = `${SELLER_SYSTEM_PROMPT(merchantName())}\n${SELLER_HOUSE_RULES}\n${languageRule(input.lang)}\nBuyer mandate: cap ${formatINR(input.mandate.spend_cap_paise)}, scope ${input.mandate.category_scope.join(", ")}.${session.upsell_done ? " The one bundle upsell has already been made." : ""}`;
@@ -578,7 +605,7 @@ async function llmTurn(input: SellerTurnInput): Promise<SellerTurnResult | null>
       if (!text) return null;
       const next: SessionState = { ...session, messages: [...session.messages, { role: "seller", content: text }] };
       persistSession(next);
-      return { reply: text, events, offer: sink.offer, order: sink.order, mode: "openai", session: next, injection_signals: signals };
+      return { reply: text, events, offer: sink.offer, order: sink.order, mode: "openai", session: next, injection_signals: signals, citations: sink.citations };
     }
     for (const call of calls) {
       if (call.type !== "function") continue;

@@ -40,9 +40,14 @@ export interface OrderCard {
 
 export type NoteTone = "ink" | "deny" | "turmeric" | "money";
 
+export interface ChatCitation {
+  source: string;
+  text: string;
+}
+
 export type ChatItem =
   | { id: string; kind: "buyer"; text: string }
-  | { id: string; kind: "seller"; text: string; events: VerdictEvent[]; offer: ChatOffer | null }
+  | { id: string; kind: "seller"; text: string; events: VerdictEvent[]; offer: ChatOffer | null; citations?: ChatCitation[] }
   | { id: string; kind: "order"; order: OrderCard }
   | { id: string; kind: "note"; text: string; tone: NoteTone };
 
@@ -442,6 +447,16 @@ export function ChatPane({
                     <span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">{t("chat.seller")}</span>
                     <div className="rounded-2xl rounded-bl-md border border-rzp-border bg-white px-4 py-3 text-sm text-rzp-text shadow-sm">
                       <p className="leading-relaxed">{item.text}</p>
+                      {item.citations && item.citations.length > 0 ? (
+                        <p className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-dotted border-rzp-border pt-2" aria-label={t("chat.source")}>
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-rzp-muted">{t("chat.source")}</span>
+                          {item.citations.map((c) => (
+                            <span key={c.source} title={c.text} className="rounded-full border border-rzp-teal/40 bg-rzp-teal/10 px-2 py-0.5 text-[11px] font-medium text-[#0E7C96]">
+                              {c.source}
+                            </span>
+                          ))}
+                        </p>
+                      ) : null}
                       <ReceiptLines events={item.events} />
                       {acceptable && item.offer ? (
                         <div className="mt-3 flex flex-wrap items-center gap-2">

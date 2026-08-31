@@ -166,6 +166,16 @@ describe("haggling and injection", () => {
     expect(b.session.upsell_done).toBe(true);
   });
 
+  it("a returns question is answered from the rulebook with a citation and no ledger entry", async () => {
+    const mandate = mandateFor(DEMO_GOALS[0]);
+    const before = listEntries().length;
+    const r = await sellerTurn({ session: loadSession(undefined, mandate.mandate_id), mandate, message: "What is your return policy?", now: NOW });
+    expect(r.reply).toContain("7-day easy returns");
+    expect(r.citations[0]?.source).toBe("Rulebook · Returns");
+    expect(r.events).toHaveLength(0);
+    expect(listEntries().length).toBe(before);
+  });
+
   it("an unrelated request gets a clarifying question and writes nothing to the book", async () => {
     const mandate = mandateFor(DEMO_GOALS[0]);
     const before = listEntries().length;
