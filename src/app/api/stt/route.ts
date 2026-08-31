@@ -1,4 +1,4 @@
-import { error, json } from "@/lib/api";
+import { error, json, rateLimit } from "@/lib/api";
 import { recordVoiceCall } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,8 @@ function browserFallback() {
 }
 
 export async function POST(req: Request) {
+  const limited = rateLimit(req, "stt", 45);
+  if (limited) return limited;
   const key = process.env.SARVAM_API_KEY?.trim();
   if (!key) return browserFallback();
 

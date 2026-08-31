@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/ui/stat";
@@ -39,7 +40,24 @@ export default function MetricsPage() {
   const t = useT(strings);
   const [data, setData] = useState<MetricsResponse | null>(null);
   const [error, setError] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetNote, setResetNote] = useState<"done" | "error" | null>(null);
   const timer = useRef<number | null>(null);
+
+  const deleteData = async () => {
+    if (!window.confirm(t("danger.confirm"))) return;
+    setResetting(true);
+    setResetNote(null);
+    try {
+      const res = await fetch("/api/data/delete", { method: "POST" });
+      if (!res.ok) throw new Error("reset failed");
+      setResetNote("done");
+    } catch {
+      setResetNote("error");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -185,6 +203,26 @@ export default function MetricsPage() {
                 </table>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>{t("danger.title")}</CardTitle>
+              <CardDescription>{t("danger.desc")}</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-3">
+            <Button variant="secondary" onClick={() => void deleteData()} loading={resetting} disabled={resetting}>
+              {t("danger.button")}
+            </Button>
+            {resetNote === "done" ? <p className="text-sm text-[#087443]">{t("danger.done")}</p> : null}
+            {resetNote === "error" ? (
+              <p className="text-sm text-[#B3262C]" role="alert">
+                {t("danger.error")}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 

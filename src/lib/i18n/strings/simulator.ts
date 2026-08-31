@@ -37,6 +37,9 @@ export const simulator = dict({
     "chat.counter": "Counter",
     "chat.accept": "Accept offer",
     "chat.source": "Source",
+    "chat.ai": "AI-generated",
+    "suggest.prefix": "Next gift idea: {{name}} at {{price}}",
+    "suggest.cta": "Ask the seller",
 
     /* order card */
     "order.aria": "Order {{id}}, {{amount}}, {{stamp}}",
@@ -155,6 +158,9 @@ export const simulator = dict({
     "chat.counter": "जवाबी ऑफ़र",
     "chat.accept": "ऑफ़र स्वीकार करें",
     "chat.source": "स्रोत",
+    "chat.ai": "AI-निर्मित",
+    "suggest.prefix": "अगला तोहफ़ा आइडिया: {{name}}, {{price}} में",
+    "suggest.cta": "विक्रेता से पूछें",
 
     "order.aria": "ऑर्डर {{id}}, {{amount}}, {{stamp}}",
     "order.id": "ऑर्डर {{id}}",

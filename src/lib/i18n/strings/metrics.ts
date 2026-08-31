@@ -30,6 +30,12 @@ export const metrics = dict({
     "error": "Could not load metrics. Check that the app is running.",
     "ok": "ok",
     "failed": "failed",
+    "danger.title": "Demo data",
+    "danger.desc": "Everything here is demo data on test rails. Deleting it wipes the ledger, orders and mandates, and reseeds the sample shop.",
+    "danger.button": "Delete demo data",
+    "danger.confirm": "Delete all demo data and reseed the sample shop? The ledger, orders and mandates are wiped.",
+    "danger.done": "Demo data deleted — the sample shop is back, the book starts fresh.",
+    "danger.error": "Could not reset. Check that the app is running and try again.",
   },
   hi: {
     "page.title": "मेट्रिक्स",
@@ -59,6 +65,12 @@ export const metrics = dict({
     "error": "मेट्रिक्स लोड नहीं हो सके। जाँचें कि ऐप चल रहा है।",
     "ok": "ठीक",
     "failed": "विफल",
+    "danger.title": "डेमो डेटा",
+    "danger.desc": "यहाँ सब कुछ टेस्ट रेल्स पर डेमो डेटा है। हटाने से बही-खाता, ऑर्डर और मैंडेट मिट जाते हैं और नमूना दुकान फिर बस जाती है।",
+    "danger.button": "डेमो डेटा हटाएँ",
+    "danger.confirm": "सारा डेमो डेटा हटाकर नमूना दुकान फिर बसाएँ? बही-खाता, ऑर्डर और मैंडेट मिट जाएँगे।",
+    "danger.done": "डेमो डेटा हट गया — नमूना दुकान वापस है, बही-खाता नए सिरे से शुरू।",
+    "danger.error": "रीसेट नहीं हो पाया। जाँचें कि ऐप चल रहा है और फिर कोशिश करें।",
   },
 });
 
