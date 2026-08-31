@@ -4,7 +4,9 @@
 
 AgentGate makes any small merchant safely sellable to AI buyer agents on Razorpay test-mode rails. A deterministic policy engine sits between every agent and every rupee; a hash-chained ledger writes down every decision; the shopkeeper reads it in plain Hinglish.
 
-Built for the Razorpay Hackathon, Track 01.
+Built in India · runs entirely on Razorpay test rails.
+
+**Docs:** [Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Security](docs/SECURITY.md) · [Voice](docs/VOICE.md)
 
 <!-- EVAL:START -->
 **0 breaches across 40 attacks · 100% of money actions explained · +13% revenue vs a static store**
@@ -44,7 +46,7 @@ False blocks: 0 of 20 legit control sessions (0.0%).
 
 _Criterion-coverage on synthetic sessions with a scripted adversary; not a market claim._
 
-Last run: 2026-08-30T17:11:01.004Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 2.4s
+Last run: 2026-08-31T17:01:39.076Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 2.7s
 <!-- EVAL:END -->
 
 ## How it works
