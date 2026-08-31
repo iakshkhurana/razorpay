@@ -21,7 +21,7 @@ const dict = {
     enterprise: "Enterprise",
     enterpriseTag: "Your rails, your rules, your audit",
     faqTitle: "Questions",
-    footer: "Built for Razorpay Hackathon · Track 01",
+    footer: "Free during beta · Razorpay test rails",
   },
   hi: {
     eyebrow: "प्लान",
@@ -38,7 +38,7 @@ const dict = {
     enterprise: "एंटरप्राइज़",
     enterpriseTag: "आपकी रेल्स, आपके नियम, आपका ऑडिट",
     faqTitle: "सवाल",
-    footer: "Razorpay Hackathon · Track 01 के लिए बनाया गया",
+    footer: "बीटा में मुफ़्त · Razorpay टेस्ट रेल्स",
   },
 };
 

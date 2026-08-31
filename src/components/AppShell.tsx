@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 import { AgentVoiceToggle } from "@/components/AgentVoiceToggle";
+import { BrandLogo } from "@/components/BrandLogo";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { api, type StatsResponse } from "@/lib/demo/client";
 import { useT } from "@/lib/i18n/core";
@@ -297,7 +298,7 @@ export interface ModeBadgesProps {
 
 function BarPill({ dot, children, title }: { dot: string; children: React.ReactNode; title?: string }) {
   return (
-    <span className={cn(BAR_PILL, "border-white/15 bg-white/10 text-white/90")} title={title}>
+    <span className={cn(BAR_PILL, "border-rzp-border bg-rzp-mist text-rzp-text")} title={title}>
       <span aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
       {children}
     </span>
@@ -323,12 +324,12 @@ function ModeBadgesView({ voice, modes, offline, className }: ModeBadgesProps) {
         </BarPill>
       ) : (
         <>
-          <span aria-hidden="true" className="h-7 w-28 animate-pulse rounded-full bg-white/10" />
-          <span aria-hidden="true" className="h-7 w-36 animate-pulse rounded-full bg-white/10" />
+          <span aria-hidden="true" className="h-7 w-28 animate-pulse rounded-full bg-rzp-mist2" />
+          <span aria-hidden="true" className="h-7 w-36 animate-pulse rounded-full bg-rzp-mist2" />
         </>
       )}
       {typeof voice === "boolean" ? (
-        <BarPill dot={voice ? "bg-rzp-green" : "bg-white/40"} title={voice ? t("voice.listening") : t("voice.idle")}>
+        <BarPill dot={voice ? "bg-rzp-green" : "bg-rzp-muted/40"} title={voice ? t("voice.listening") : t("voice.idle")}>
           {voice ? t("voice.on") : t("voice.off")}
         </BarPill>
       ) : null}
@@ -379,42 +380,6 @@ export function Avatar({ name, className }: { name?: string | null; className?: 
 
 const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
-/**
- * Text-only brand: a navy tile with the teal initials and the wordmark. No
- * image asset. `mark` is the tile alone (labelled with the workspace name);
- * `light` / `dark` link home from white or navy bars.
- */
-function Wordmark({ variant, size, label }: { variant: "mark" | "light" | "dark"; size: number; label?: string }) {
-  const t = useT(common);
-  const tn = useT(nav);
-  const mark = (
-    <span
-      aria-hidden="true"
-      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-rzp-navy font-display text-[11px] font-bold tracking-wide text-rzp-cyan"
-      style={{ width: size, height: size }}
-    >
-      AG
-    </span>
-  );
-  if (variant === "mark") {
-    return (
-      <span className="inline-flex items-center" role="img" aria-label={label ?? t("brand.name")}>
-        {mark}
-      </span>
-    );
-  }
-  return (
-    <Link
-      href="/"
-      className={cn("inline-flex items-center gap-2 rounded-lg", FOCUS_RING, variant === "dark" && "focus-visible:ring-offset-rzp-navy")}
-      aria-label={tn("brand.home")}
-    >
-      {mark}
-      <span className={cn("font-display text-base font-bold tracking-tight", variant === "dark" ? "text-white" : "text-rzp-text")}>{t("brand.name")}</span>
-    </Link>
-  );
-}
-
 function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
   const t = useT(common);
   return (
@@ -423,12 +388,11 @@ function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean;
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
       className={cn(
-        "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+        "group relative flex items-center gap-3 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
         FOCUS_RING,
-        active ? "bg-rzp-ice text-rzp-blueDeep" : "text-rzp-muted hover:bg-rzp-mist hover:text-rzp-text",
+        active ? "bg-rzp-ice text-rzp-blueDeep shadow-sm" : "text-rzp-muted hover:bg-rzp-mist hover:text-rzp-text",
       )}
     >
-      <span aria-hidden="true" className={cn("absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-rzp-blue transition-opacity", active ? "opacity-100" : "opacity-0")} />
       <item.Icon className={cn("h-5 w-5 shrink-0", active ? "text-rzp-blue" : "text-rzp-muted group-hover:text-rzp-text")} />
       <span>{t(item.labelKey)}</span>
     </Link>
@@ -437,20 +401,37 @@ function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean;
 
 function NavGroups({ active, onNavigate }: { active: ShellSection | null; onNavigate?: () => void }) {
   const t = useT(common);
+  const [closed, setClosed] = React.useState<Record<string, boolean>>({});
   return (
     <>
-      {NAV.map((group) => (
-        <div key={group.labelKey}>
-          <p className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-rzp-muted">{t(group.labelKey)}</p>
-          <ul className="space-y-0.5">
-            {group.items.map((item) => (
-              <li key={item.key}>
-                <NavLink item={item} active={active === item.key} onNavigate={onNavigate} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {NAV.map((group) => {
+        const isClosed = closed[group.labelKey] ?? false;
+        return (
+          <div key={group.labelKey}>
+            <button
+              type="button"
+              onClick={() => setClosed((prev) => ({ ...prev, [group.labelKey]: !isClosed }))}
+              aria-expanded={!isClosed}
+              className={cn(
+                "flex w-full items-center justify-between rounded-lg px-3 pb-1.5 pt-2 text-[13px] font-semibold text-rzp-muted transition-colors hover:text-rzp-text",
+                FOCUS_RING,
+              )}
+            >
+              {t(group.labelKey)}
+              <ChevronIcon className={cn("h-3.5 w-3.5 shrink-0 transition-transform", isClosed && "-rotate-90")} />
+            </button>
+            {!isClosed ? (
+              <ul className="space-y-0.5">
+                {group.items.map((item) => (
+                  <li key={item.key}>
+                    <NavLink item={item} active={active === item.key} onNavigate={onNavigate} />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        );
+      })}
     </>
   );
 }
@@ -490,7 +471,7 @@ function WorkspaceHeader({ merchant, onNavigate }: { merchant: string | null; on
         onClick={() => setOpen((o) => !o)}
         className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-rzp-mist", FOCUS_RING)}
       >
-        <Wordmark variant="mark" size={36} label={name} />
+        <BrandLogo variant="mark" size={36} href={null} label={name} />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-display text-sm font-bold leading-tight text-rzp-text">{name}</span>
           <span className="block truncate text-xs text-rzp-muted">{t("shell.testWorkspace")}</span>
@@ -547,7 +528,7 @@ function RailsCard({ stats, offline }: ShellStats) {
   const meter = stats?.eval ? Math.round(stats.eval.explained_pct) : intact === null ? null : intact ? 100 : 0;
 
   return (
-    <div className="rounded-2xl border border-rzp-border bg-rzp-ice p-3">
+    <div className="rounded-2xl bg-rzp-mist/80 p-3">
       <div className="flex items-center gap-2">
         <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-rzp-green animate-dot-pulse" />
         <p className="truncate text-xs font-semibold text-rzp-text">{payments === "mock" ? tn("rails.mock") : t("shell.testRails")}</p>
@@ -679,7 +660,7 @@ function MobileDrawer({ id, open, onClose, active, stats, offline }: { id: strin
             className="fixed inset-y-0 left-0 z-50 flex w-[min(20rem,88vw)] flex-col bg-white shadow-lift lg:hidden"
           >
             <div className="flex h-14 items-center justify-between border-b border-rzp-border px-3">
-              <Wordmark variant="light" size={32} />
+              <BrandLogo size={30} />
               <button
                 ref={closeRef}
                 type="button"
@@ -734,8 +715,8 @@ const WIDTH: Record<NonNullable<AppShellProps["width"]>, string> = {
 };
 
 /**
- * Product chrome: navy top bar (brand · centre notch with the live TEST MODE
- * pill · mode pills · avatar), a white sidebar with the workspace header,
+ * Product chrome: clean white top bar (live TEST MODE pill · mode pills ·
+ * avatar), a white sidebar with the gate-mark workspace header, collapsible
  * grouped navigation and the rails card (voice + language), a page header and
  * a mist content area. Under lg the sidebar becomes a drawer behind the menu
  * button. Children render inside a <main>, so pages should not add their own.
@@ -758,7 +739,7 @@ export function AppShell({ title, subtitle, actions, headerExtra, children, sect
 
   return (
     <div className="flex min-h-screen flex-col bg-rzp-mist text-rzp-text">
-      <header className="sticky top-0 z-40 h-14 bg-rzp-navy text-white">
+      <header className="sticky top-0 z-40 h-14 border-b border-rzp-border bg-white">
         <div className="relative flex h-full items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex items-center gap-2">
             <button
@@ -767,19 +748,19 @@ export function AppShell({ title, subtitle, actions, headerExtra, children, sect
               aria-expanded={drawer}
               aria-controls={drawerId}
               aria-label={drawer ? tn("drawer.close") : tn("drawer.open")}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white/85 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-rzp-navy lg:hidden"
+              className={cn("inline-flex h-9 w-9 items-center justify-center rounded-lg text-rzp-muted hover:bg-rzp-mist hover:text-rzp-text lg:hidden", FOCUS_RING)}
             >
               {drawer ? <CloseIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
             </button>
-            <Wordmark variant="dark" size={32} />
+            <BrandLogo size={30} className="lg:hidden" />
           </div>
 
           <div className="absolute left-1/2 hidden -translate-x-1/2 sm:block">
-            <TestModePill payments={payments} />
+            <TestModePill tone="light" payments={payments} />
           </div>
 
           <div className="flex items-center gap-2">
-            <TestModePill payments={payments} className="sm:hidden" />
+            <TestModePill tone="light" payments={payments} className="sm:hidden" />
             <ModeBadges voice={voice} modes={stats?.modes ?? null} offline={offline} className="hidden md:flex" />
             <Avatar name={merchantName} />
           </div>
