@@ -380,28 +380,116 @@ export function Avatar({ name, className }: { name?: string | null; className?: 
 
 const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
-function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
+/** Panel glyph: the sidebar's own outline, with its rail filled in. */
+function PanelIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+      <path d="M9.5 4.5v15" />
+      <path d="M6.5 8.5h0M6.5 12h0" />
+    </svg>
+  );
+}
+
+const SIDEBAR_KEY = "agentgate.sidebar.collapsed";
+
+/**
+ * Remembers whether the sidebar is collapsed. Starts expanded on both server and
+ * client so hydration matches, then adopts the stored preference on mount.
+ */
+function useSidebarCollapsed(): [boolean, () => void] {
+  const [collapsed, setCollapsed] = React.useState(false);
+
+  React.useEffect(() => {
+    try {
+      if (window.localStorage.getItem(SIDEBAR_KEY) === "1") setCollapsed(true);
+    } catch {
+      /* a browser with storage blocked simply starts expanded */
+    }
+  }, []);
+
+  const toggle = React.useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+      } catch {
+        /* the preference is a convenience, never a requirement */
+      }
+      return next;
+    });
+  }, []);
+
+  return [collapsed, toggle];
+}
+
+function CollapseToggle({ collapsed, onToggle, className }: { collapsed: boolean; onToggle: () => void; className?: string }) {
+  const tn = useT(nav);
+  const label = collapsed ? tn("sidebar.expand") : tn("sidebar.collapse");
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={label}
+      aria-expanded={!collapsed}
+      title={label}
+      className={cn(
+        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-rzp-muted transition-colors hover:bg-rzp-mist hover:text-rzp-text",
+        FOCUS_RING,
+        className,
+      )}
+    >
+      <PanelIcon className="h-[18px] w-[18px]" />
+    </button>
+  );
+}
+
+function NavLink({ item, active, onNavigate, collapsed = false }: { item: NavItem; active: boolean; onNavigate?: () => void; collapsed?: boolean }) {
   const t = useT(common);
+  const label = t(item.labelKey);
   return (
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
+      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
       className={cn(
-        "group relative flex items-center gap-3 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
+        "group relative flex items-center rounded-full text-sm font-medium transition-colors",
+        collapsed ? "h-10 w-10 justify-center" : "gap-3 px-3.5 py-2",
         FOCUS_RING,
         active ? "bg-rzp-ice text-rzp-blueDeep shadow-sm" : "text-rzp-muted hover:bg-rzp-mist hover:text-rzp-text",
       )}
     >
       <item.Icon className={cn("h-5 w-5 shrink-0", active ? "text-rzp-blue" : "text-rzp-muted group-hover:text-rzp-text")} />
-      <span>{t(item.labelKey)}</span>
+      {collapsed ? null : <span>{label}</span>}
     </Link>
   );
 }
 
-function NavGroups({ active, onNavigate }: { active: ShellSection | null; onNavigate?: () => void }) {
+function NavGroups({ active, onNavigate, collapsed = false }: { active: ShellSection | null; onNavigate?: () => void; collapsed?: boolean }) {
   const t = useT(common);
   const [closed, setClosed] = React.useState<Record<string, boolean>>({});
+
+  // Collapsed to a rail: icons only, groups kept apart by a hairline instead of a heading.
+  if (collapsed) {
+    return (
+      <>
+        {NAV.map((group, i) => (
+          <div key={group.labelKey} className={cn(i > 0 && "mt-2 border-t border-rzp-border pt-2")}>
+            <ul className="flex flex-col items-center gap-1">
+              {group.items.map((item) => (
+                <li key={item.key}>
+                  <NavLink item={item} active={active === item.key} onNavigate={onNavigate} collapsed />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </>
+    );
+  }
+
   return (
     <>
       {NAV.map((group) => {
@@ -436,7 +524,17 @@ function NavGroups({ active, onNavigate }: { active: ShellSection | null; onNavi
   );
 }
 
-function WorkspaceHeader({ merchant, onNavigate }: { merchant: string | null; onNavigate?: () => void }) {
+function WorkspaceHeader({
+  merchant,
+  onNavigate,
+  collapsed = false,
+  onToggleCollapse,
+}: {
+  merchant: string | null;
+  onNavigate?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}) {
   const t = useT(common);
   const tn = useT(nav);
   const reduce = useReducedMotion();
@@ -461,24 +559,36 @@ function WorkspaceHeader({ merchant, onNavigate }: { merchant: string | null; on
     };
   }, [open]);
 
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-1 border-b border-rzp-border px-2 py-2.5">
+        <BrandLogo variant="mark" size={32} href="/" label={name} />
+        {onToggleCollapse ? <CollapseToggle collapsed onToggle={onToggleCollapse} /> : null}
+      </div>
+    );
+  }
+
   return (
     <div ref={ref} className="relative border-b border-rzp-border p-2.5">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={id}
-        aria-haspopup="true"
-        onClick={() => setOpen((o) => !o)}
-        className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-rzp-mist", FOCUS_RING)}
-      >
-        <BrandLogo variant="mark" size={36} href={null} label={name} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-sm font-bold leading-tight text-rzp-text">{name}</span>
-          <span className="block truncate text-xs text-rzp-muted">{t("shell.testWorkspace")}</span>
-        </span>
-        <ChevronIcon className={cn("h-4 w-4 shrink-0 text-rzp-muted transition-transform", open && "rotate-180")} />
-        <span className="sr-only">{t("shell.switchWorkspace")}</span>
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={id}
+          aria-haspopup="true"
+          onClick={() => setOpen((o) => !o)}
+          className={cn("flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-rzp-mist", FOCUS_RING)}
+        >
+          <BrandLogo variant="mark" size={36} href={null} label={name} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-display text-sm font-bold leading-tight text-rzp-text">{name}</span>
+            <span className="block truncate text-xs text-rzp-muted">{t("shell.testWorkspace")}</span>
+          </span>
+          <ChevronIcon className={cn("h-4 w-4 shrink-0 text-rzp-muted transition-transform", open && "rotate-180")} />
+          <span className="sr-only">{t("shell.switchWorkspace")}</span>
+        </button>
+        {onToggleCollapse ? <CollapseToggle collapsed={false} onToggle={onToggleCollapse} /> : null}
+      </div>
 
       <AnimatePresence>
         {open ? (
@@ -594,19 +704,35 @@ function AvatarRow({ merchant }: { merchant: string | null }) {
   );
 }
 
-function Sidebar({ active, stats, offline }: { active: ShellSection | null } & ShellStats) {
+function Sidebar({
+  active,
+  stats,
+  offline,
+  collapsed,
+  onToggleCollapse,
+}: { active: ShellSection | null; collapsed: boolean; onToggleCollapse: () => void } & ShellStats) {
   const t = useT(common);
   const merchant = stats?.merchant?.name ?? null;
   return (
-    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-[264px] shrink-0 flex-col border-r border-rzp-border bg-white lg:flex">
-      <WorkspaceHeader merchant={merchant} />
-      <nav aria-label={t("shell.primaryNav")} className="scrollbar-thin flex-1 space-y-3 overflow-y-auto px-3 py-3">
-        <NavGroups active={active} />
+    <aside
+      className={cn(
+        "sticky top-14 hidden h-[calc(100vh-3.5rem)] shrink-0 flex-col border-r border-rzp-border bg-white transition-[width] duration-200 lg:flex",
+        collapsed ? "w-[68px]" : "w-[264px]",
+      )}
+    >
+      <WorkspaceHeader merchant={merchant} collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
+      <nav
+        aria-label={t("shell.primaryNav")}
+        className={cn("scrollbar-thin flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "space-y-3 px-3")}
+      >
+        <NavGroups active={active} collapsed={collapsed} />
       </nav>
-      <div className="border-t border-rzp-border px-3 pb-3 pt-3">
-        <RailsCard stats={stats} offline={offline} />
-        <AvatarRow merchant={merchant} />
-      </div>
+      {collapsed ? null : (
+        <div className="border-t border-rzp-border px-3 pb-3 pt-3">
+          <RailsCard stats={stats} offline={offline} />
+          <AvatarRow merchant={merchant} />
+        </div>
+      )}
     </aside>
   );
 }
@@ -732,6 +858,7 @@ export function AppShell({ title, subtitle, actions, headerExtra, children, sect
   const drawerId = React.useId();
   const [drawer, setDrawer] = React.useState(false);
   const closeDrawer = React.useCallback(() => setDrawer(false), []);
+  const [collapsed, toggleCollapsed] = useSidebarCollapsed();
 
   React.useEffect(() => {
     setDrawer(false);
@@ -770,7 +897,7 @@ export function AppShell({ title, subtitle, actions, headerExtra, children, sect
       <MobileDrawer id={drawerId} open={drawer} onClose={closeDrawer} active={active} stats={stats} offline={offline} />
 
       <div className="flex flex-1">
-        <Sidebar active={active} stats={stats} offline={offline} />
+        <Sidebar active={active} stats={stats} offline={offline} collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
 
         <div className="min-w-0 flex-1">
           <div className={cn("mx-auto w-full px-4 pb-4 pt-8 sm:px-6 sm:pt-10 lg:px-8", widthClass)}>
