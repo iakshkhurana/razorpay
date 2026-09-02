@@ -9,6 +9,7 @@ import { Counter, EASE_OUT, Reveal } from "@/components/motion";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { VerdictStamp } from "@/components/VerdictStamp";
 import { Skeleton, SkeletonLines } from "@/components/ui/skeleton";
 import { Stat } from "@/components/ui/stat";
 import { useToast } from "@/components/ui/toast";
@@ -378,6 +379,9 @@ export default function EvalPage() {
               </Reveal>
             </div>
             <RedTeam ref={redTeamRef} report={report} emphasis={emphasis} t={t} />
+            <Reveal amount={0.1}>
+              <LiveRedTeam t={t} />
+            </Reveal>
             <Reveal amount={0.1}>
               <Falsification report={report} t={t} />
             </Reveal>
@@ -980,6 +984,149 @@ function Coverage({ report, t }: { report: EvalReport; t: T }) {
           </Link>{" "}
           {t("coverage.openTower.tail")}
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Live red-team console                                              */
+/* ------------------------------------------------------------------ */
+
+interface LiveAttackOption {
+  id: string;
+  category: string;
+  description: string;
+}
+
+interface LiveVerdict {
+  action: string;
+  decision: string;
+  reason_code: string;
+  human_reason: string;
+  amount_paise: number;
+  ledger_entry_id: string;
+}
+
+interface LiveResult {
+  attack: LiveAttackOption;
+  verdicts: LiveVerdict[];
+  breached: boolean;
+  caught: boolean;
+  expected_reason_codes: string[];
+}
+
+/**
+ * A table of forty caught attacks asks for trust. This asks for a click: the
+ * same attack, fired at the shop that is running right now, refused by the same
+ * engine and written into the same book.
+ */
+function LiveRedTeam({ t }: { t: T }) {
+  const [options, setOptions] = useState<LiveAttackOption[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<LiveResult | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/agent/attack", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { attacks?: LiveAttackOption[] };
+        if (alive && Array.isArray(data.attacks)) setOptions(data.attacks);
+      } catch {
+        /* the console is optional; the scorecard above stands on its own */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const fire = async (id: string) => {
+    setBusy(id);
+    setError(false);
+    try {
+      const res = await fetch("/api/agent/attack", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ attack_id: id }),
+      });
+      if (!res.ok) throw new Error("attack failed");
+      setResult((await res.json()) as LiveResult);
+    } catch {
+      setError(true);
+      setResult(null);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (options.length === 0) return null;
+  const last = result?.verdicts.at(-1) ?? null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>{t("live.title")}</CardTitle>
+          <CardDescription className="mt-1">{t("live.desc")}</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-rzp-muted">{t("live.pick")}</p>
+        <div className="flex flex-wrap gap-2">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => void fire(o.id)}
+              disabled={busy !== null}
+              title={o.description}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rzp-blue focus-visible:ring-offset-2",
+                "disabled:cursor-not-allowed disabled:opacity-60",
+                result?.attack.id === o.id
+                  ? "border-rzp-blue bg-rzp-ice text-rzp-blueDeep"
+                  : "border-rzp-border bg-white text-rzp-text hover:border-rzp-blue hover:bg-rzp-mist",
+              )}
+            >
+              {busy === o.id ? t("live.running") : o.category.replace(/_/g, " ")}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 min-h-[5rem]" aria-live="polite">
+          {error ? (
+            <p className="text-sm text-[#B3262C]" role="alert">
+              {t("live.error")}
+            </p>
+          ) : result && last ? (
+            <div className={cn("rounded-xl border p-4", result.breached ? "border-rzp-red bg-rzp-red/10" : "border-rzp-border bg-rzp-mist")}>
+              <div className="flex flex-wrap items-center gap-3">
+                <VerdictStamp kind={last.decision} size="sm" />
+                <span className="font-mono text-xs uppercase tracking-[0.14em] text-rzp-muted">{last.reason_code}</span>
+                <span className="font-mono text-sm font-semibold tnum text-rzp-text">{formatINR(last.amount_paise)}</span>
+                <Badge tone={result.breached ? "red" : "green"} dot>
+                  {result.breached ? t("live.breached") : t("live.refused")}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm text-rzp-text">{last.human_reason}</p>
+              <p className="mt-2 text-xs text-rzp-muted">
+                {result.attack.description} · {t("live.expected", { code: result.expected_reason_codes[0] ?? "—" })} ·{" "}
+                <Link href="/dashboard" className="rounded font-medium text-rzp-blueDeep underline-offset-4 hover:underline">
+                  {t("live.book")}
+                </Link>
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-rzp-muted">{t("live.empty")}</p>
+          )}
+        </div>
+
+        <p className="mt-3 text-xs text-rzp-muted">{t("live.note")}</p>
       </CardContent>
     </Card>
   );
