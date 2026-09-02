@@ -10,6 +10,7 @@ import { skusFromCsv } from "./catalog";
 import { clearAllTables, getMandate, getSku, isNonceUsed, listOrders, replaceCatalog, setPolicy, upsertMerchant } from "./db";
 import { listEntries, parsePolicyChecks, verifyChain } from "./ledger";
 import { issueMandate, verifyMandateToken } from "./mandate";
+import { MockPaymentPort, setPaymentPortOverride, type PaymentPort } from "./payments";
 import { DEFAULT_POLICY, type MandateClaims } from "./schemas";
 import {
   applyPaymentEvent,
@@ -220,6 +221,68 @@ describe("flow 3 — graceful failure", () => {
     expect(r?.order.status).toBe("AWAITING_PAYMENT");
     expect(listEntries().length).toBe(before);
     expect(await reconcileOrder("ghost")).toBeNull();
+  });
+
+  it("a shopper identified by phone or nickname still checks out", async () => {
+    // user_ref is free-form; only a real address may travel to the provider as an email.
+    for (const user_ref of ["+919876543210", "ramesh-ji", "priya@example", "priya@example.com"]) {
+      clearAllTables();
+      upsertMerchant({ name: "Ramesh Handlooms", live: true });
+      replaceCatalog(seed);
+      setPolicy(DEFAULT_POLICY);
+      const { token } = issueMandate({
+        agent_id: "buyer-agent-demo",
+        user_ref,
+        spend_cap_paise: 200000,
+        category_scope: ["handloom", "gifts"],
+        ttl_seconds: 3600,
+        now: NOW,
+      });
+      const verified = verifyMandateToken(token, NOW);
+      if (!verified.ok) throw new Error(verified.error);
+      recordMandateIssued(verified.claims);
+
+      const offer = makeOffer({ mandate: verified.claims, sku_ids: [SAREE], qty: 1, now: NOW });
+      const result = await checkout({ mandate: verified.claims, offer_id: offer.offer.id, now: NOW });
+      expect(result.ok, `checkout threw away ${user_ref}`).toBe(true);
+      if (!result.ok) return;
+      expect(result.payment_error).toBeUndefined();
+      expect(result.order.status).toBe("AWAITING_PAYMENT");
+    }
+  });
+
+  it("a provider outage is written to the book instead of thrown at the caller", async () => {
+    const working = new MockPaymentPort();
+    const outage: PaymentPort = {
+      mode: "mock",
+      createOrder: async () => {
+        throw new Error("provider unreachable");
+      },
+      issueFallbackLink: (input) => working.issueFallbackLink(input),
+      verifyWebhook: (body, signature) => working.verifyWebhook(body, signature),
+      fetchStatus: () => working.fetchStatus(),
+    };
+    setPaymentPortOverride(outage);
+    try {
+      const mandate = newMandate(200000);
+      const offer = makeOffer({ mandate, sku_ids: [SAREE], qty: 1, now: NOW });
+      const result = await checkout({ mandate, offer_id: offer.offer.id, now: NOW });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.payment_error).toContain("provider unreachable");
+      // nothing moved: no link, order still a draft, mandate not consumed
+      expect(result.order.payment_url).toBeNull();
+      expect(result.order.status).toBe("DRAFT");
+      expect(isNonceUsed(mandate.nonce)).toBe(false);
+
+      const last = listEntries().at(-1);
+      expect(last?.reason_code).toBe("PAYMENT_LINK_ERROR");
+      expect(last?.human_reason).toContain("Nothing was charged");
+      expect(verifyChain()).toBeNull();
+    } finally {
+      setPaymentPortOverride(null);
+    }
   });
 
   it("a failure webhook for an unknown order is refused without touching the book", async () => {

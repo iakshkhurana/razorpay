@@ -7,6 +7,9 @@ import { SimulateWebhookRequestSchema } from "../schemas";
 
 export type PaymentsMode = "mock" | "razorpay";
 
+/** The one address validator: callers test with it, the adapter enforces it. */
+export const CustomerEmailSchema = z.string().email();
+
 export const CreateOrderInputSchema = z.object({
   order_id: z.string().min(1),
   /** integer paise; Razorpay refuses anything under 100 (₹1) */
@@ -16,7 +19,7 @@ export const CreateOrderInputSchema = z.object({
   idempotency_key: z.string().min(1),
   customer: z.object({
     name: z.string().min(1),
-    email: z.string().email().optional(),
+    email: CustomerEmailSchema.optional(),
     contact: z.string().min(1).optional(),
   }),
 });
