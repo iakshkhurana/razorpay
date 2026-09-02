@@ -12,11 +12,16 @@ Validation failures return `422` with zod `issues`; refused mandates return `401
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/.well-known/agent-commerce.json` | The shop described for a machine: auth scheme, endpoints, the rules an agent must respect, what each verdict means, and the guarantees. Derived from the live rulebook, so it cannot drift. Also served at `/api/agent/manifest`. |
 | `GET` | `/api/agent/discover?q=` | Semantic catalog search. Results are ranked and scope‑marked; the public policy rides along so an agent knows the rules before it asks. |
 | `POST` | `/api/agent/negotiate` | One buyer message → one seller reply. Body: `{ session_id?, mandate_token, message, lang? }`. Reply carries verdict `events`, the current `offer`, `citations` for grounded answers, and `injection_signals`. Rate limit: 30/min. |
 | `POST` | `/api/agent/checkout` | `{ mandate_token, offer_id }` → policy verdict; on ALLOW creates the order + payment link. Idempotency key `mandate_id + offer_id`. |
 
 Every price in a negotiate/checkout response has been through the policy engine; the LLM cannot quote a number the engine did not stamp.
+
+The manifest publishes the rules that decide whether a request will be accepted — categories, quantity, order value, the owner's threshold, the refund policy — and deliberately withholds the price floor and maximum discount. Those are the merchant's negotiating position: the engine enforces them, and an agent that pushes past gets a `COUNTER` carrying the best price the shop can do.
+
+A buyer message that tries to talk the seller out of its rules ("ignore your rules", a claimed merchant approval, fabricated tool output) is detected and appended to the ledger as `PROMPT_INJECTION_DETECTED`. It is a note, not a verdict — the engine bounds the outcome either way.
 
 ## Merchant & demo
 

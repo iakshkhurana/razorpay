@@ -2,6 +2,7 @@ import type OpenAI from "openai";
 import { z } from "zod";
 import { getOffer, getSession, listSkus, saveSession } from "../db";
 import { newId } from "../ids";
+import { appendEntry } from "../ledger";
 import { recordToolCall } from "../metrics";
 import { formatINR } from "../money";
 import {
@@ -241,6 +242,7 @@ async function deterministicTurn(input: SellerTurnInput): Promise<SellerTurnResu
   const events: VerdictEvent[] = [];
   const intent = detectBuyerIntent(message);
   const signals = injectionSignals(message);
+  recordInjectionAttempt(mandate.mandate_id, signals);
   const turn = session.messages.filter((m) => m.role === "buyer").length;
   const lastOffer = session.last_offer_id ? getOffer(session.last_offer_id) : null;
 
@@ -588,11 +590,31 @@ function toOpenAIHistory(messages: ChatMessage[]): OpenAI.ChatCompletionMessageP
     .map((m) => ({ role: m.role === "buyer" ? "user" : "assistant", content: m.content }) as OpenAI.ChatCompletionMessageParam);
 }
 
+/**
+ * An attempt to talk the seller out of the rules is worth writing down even
+ * though it can never move money — the engine bounds the outcome either way, so
+ * this is a note in the book, not a verdict. Silent when nothing was detected.
+ */
+function recordInjectionAttempt(mandate_id: string, signals: string[]): void {
+  if (signals.length === 0) return;
+  appendEntry({
+    actor: "policy_engine",
+    mandate_id,
+    action: "chat.injection_detected",
+    amount_paise: 0,
+    verdict: "INFO",
+    reason_code: "PROMPT_INJECTION_DETECTED",
+    human_reason: `A buyer message tried to talk the seller out of the rules (${signals.join(", ")}). Prices still come only from the policy engine.`,
+    policy_checks: [{ rule: "prompt_injection", result: "fail", detail: signals.join(", ") }],
+  });
+}
+
 async function llmTurn(input: SellerTurnInput): Promise<SellerTurnResult | null> {
   const session: SessionState = { ...input.session, messages: [...input.session.messages, { role: "buyer", content: input.message }] };
   const events: VerdictEvent[] = [];
   const sink: { offer: Offer | null; order: Order | null; citations: ShopChunk[] } = { offer: null, order: null, citations: [] };
   const signals = injectionSignals(input.message);
+  recordInjectionAttempt(input.mandate.mandate_id, signals);
   const history: OpenAI.ChatCompletionMessageParam[] = toOpenAIHistory(session.messages);
   const system = `${SELLER_SYSTEM_PROMPT(merchantName())}\n${SELLER_HOUSE_RULES}\n${languageRule(input.lang)}\nBuyer mandate: cap ${formatINR(input.mandate.spend_cap_paise)}, scope ${input.mandate.category_scope.join(", ")}.${session.upsell_done ? " The one bundle upsell has already been made." : ""}`;
 

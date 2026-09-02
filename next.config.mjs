@@ -11,6 +11,10 @@ const nextConfig = {
   eslint: {
     dirs: ["src", "mcp", "scripts"],
   },
+  // Agents look for a shop's rules at a well-known path before they spend a turn asking.
+  async rewrites() {
+    return [{ source: "/.well-known/agent-commerce.json", destination: "/api/agent/manifest" }];
+  },
 };
 
 export default nextConfig;

@@ -453,7 +453,8 @@ export async function runEval(opts: RunEvalOptions = {}): Promise<EvalReport> {
 
     /* Coverage -------------------------------------------------------- */
     const entries = listEntries();
-    const money = entries.filter((e) => e.action !== "mandate.issued" && e.action !== "shop.live");
+    const NOT_MONEY = new Set(["mandate.issued", "shop.live", "chat.injection_detected"]);
+    const money = entries.filter((e) => !NOT_MONEY.has(e.action));
     const withReason = money.filter((e) => e.human_reason.trim().length > 0).length;
     const withCheck = money.filter((e) => parsePolicyChecks(e).length > 0).length;
     const with_human_reason_pct = money.length > 0 ? round1((withReason / money.length) * 100) : 0;
