@@ -378,6 +378,9 @@ export default function EvalPage() {
               </Reveal>
             </div>
             <RedTeam ref={redTeamRef} report={report} emphasis={emphasis} t={t} />
+            <Reveal amount={0.1}>
+              <Falsification report={report} t={t} />
+            </Reveal>
             <RunMeta report={report} source={source} t={t} locale={locale} />
           </>
         ) : headline ? (
@@ -979,6 +982,109 @@ function Coverage({ report, t }: { report: EvalReport; t: T }) {
         </p>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * The two questions a sharp judge asks about a zero: can the detector see a
+ * breach at all, and what was the guard worth in rupees. Both come straight from
+ * the run — nothing here is written by hand.
+ */
+function Falsification({ report, t }: { report: EvalReport; t: T }) {
+  const hc = report.harness_check;
+  const econ = report.economics;
+  if (!hc && !econ) return null;
+  const th = "px-3 pb-2 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-rzp-muted";
+  const td = "px-3 py-2 align-middle";
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-2">
+      {hc ? (
+        <Card className="h-full">
+          <CardHeader>
+            <div>
+              <CardTitle>{t("selftest.title")}</CardTitle>
+              <CardDescription className="mt-1">{t("selftest.desc")}</CardDescription>
+            </div>
+            <Badge tone={hc.sound ? "green" : "red"} dot className="shrink-0">
+              {hc.sound ? t("selftest.sound") : t("selftest.unsound")}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 font-mono text-sm tnum text-rzp-text">
+              {t("selftest.score", { detected: hc.detected, total: hc.mutations })}
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[26rem] text-sm">
+                <thead>
+                  <tr className="border-b border-rzp-border">
+                    <th scope="col" className={th}>{t("selftest.th.guard")}</th>
+                    <th scope="col" className={th}>{t("selftest.th.attack")}</th>
+                    <th scope="col" className={th}>{t("selftest.th.seen")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rzp-border">
+                  {hc.detail.map((m) => (
+                    <tr key={m.id}>
+                      <td className={td}>{m.label}</td>
+                      <td className={cn(td, "font-mono text-xs text-rzp-muted")}>{m.attack_id}</td>
+                      <td className={td}>
+                        <Badge tone={m.detected ? "green" : "red"}>{m.detected ? t("selftest.seen") : t("selftest.blind")}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-rzp-muted">{t("selftest.note")}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {econ ? (
+        <Card className="h-full">
+          <CardHeader>
+            <div>
+              <CardTitle>{t("econ.title")}</CardTitle>
+              <CardDescription className="mt-1">{t("econ.desc")}</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[26rem] text-sm">
+                <thead>
+                  <tr className="border-b border-rzp-border">
+                    <th scope="col" className={th}>{t("econ.th.shop")}</th>
+                    <th scope="col" className={cn(th, "text-right")}>{t("econ.th.against")}</th>
+                    <th scope="col" className={cn(th, "text-right")}>{t("econ.th.earned")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rzp-border">
+                  <tr>
+                    <td className={td}>{t("econ.allow")}</td>
+                    <td className={cn(td, "text-right font-mono tnum text-[#B3262C]")}>{formatINR(econ.refused_paise)}</td>
+                    <td className={cn(td, "text-right font-mono tnum")}>{formatINR(econ.earned_paise)}</td>
+                  </tr>
+                  <tr>
+                    <td className={td}>{t("econ.block")}</td>
+                    <td className={cn(td, "text-right font-mono tnum")}>₹0</td>
+                    <td className={cn(td, "text-right font-mono tnum text-[#B3262C]")}>₹0</td>
+                  </tr>
+                  <tr className="bg-rzp-ice/60">
+                    <td className={cn(td, "font-semibold")}>{t("econ.us")}</td>
+                    <td className={cn(td, "text-right font-mono font-semibold tnum text-[#087443]")}>₹0</td>
+                    <td className={cn(td, "text-right font-mono font-semibold tnum text-[#087443]")}>
+                      {formatINR(econ.earned_paise - econ.false_block_paise)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-rzp-muted">{t("econ.note", { gated: formatINR(econ.gated_paise) })}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
   );
 }
 

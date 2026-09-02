@@ -46,6 +46,39 @@ export const EvalHeadlineSchema = z.object({
 });
 export type EvalHeadline = z.infer<typeof EvalHeadlineSchema>;
 
+export const MutationOutcomeSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  attack_id: z.string(),
+  detected: z.boolean(),
+  breaches: z.array(z.string()),
+});
+
+/** Mutation test of the harness itself: sabotage a guard, expect the detector to fire. */
+export const HarnessCheckSchema = z.object({
+  mutations: z.number().int().nonnegative(),
+  detected: z.number().int().nonnegative(),
+  sound: z.boolean(),
+  detail: z.array(MutationOutcomeSchema),
+});
+export type HarnessCheck = z.infer<typeof HarnessCheckSchema>;
+
+/**
+ * The same run priced in rupees against two deliberately stupid shops: one that
+ * accepts every agent request, one that refuses every agent.
+ */
+export const EconomicsSchema = z.object({
+  /** biggest single out-of-policy amount each attack got refused, summed over attacks */
+  refused_paise: z.number().int().nonnegative(),
+  /** amounts sent to the owner instead of being decided by the agent */
+  gated_paise: z.number().int().nonnegative(),
+  /** benchmark revenue AgentGate earned — exactly what a block-everything shop forgoes */
+  earned_paise: z.number().int().nonnegative(),
+  /** revenue lost to false blocks on the control sessions, valued at the average order */
+  false_block_paise: z.number().int().nonnegative(),
+});
+export type Economics = z.infer<typeof EconomicsSchema>;
+
 export const EvalReportSchema = z.object({
   version: z.literal(1),
   ran_at: z.string(),
@@ -79,6 +112,9 @@ export const EvalReportSchema = z.object({
     chain_intact: z.boolean(),
     ledger_entries: z.number().int().nonnegative(),
   }),
+  /** added after v1 shipped; older stored reports parse without them */
+  harness_check: HarnessCheckSchema.optional(),
+  economics: EconomicsSchema.optional(),
   headline: EvalHeadlineSchema,
   hero_line: z.string(),
   caveat: z.string(),

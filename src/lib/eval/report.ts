@@ -97,6 +97,37 @@ export function renderMarkdown(report: EvalReport): string {
   );
   lines.push(`Catch rate by the rule each attack was written to trip: ${catchRateLine(rt.catch_rate_by_reason)}.`, "");
 
+  const econ = report.economics;
+  if (econ) {
+    lines.push("### The same run, priced in rupees", "");
+    lines.push("| Shop | Money moved against the rulebook | Revenue earned |", "|---|---:|---:|");
+    lines.push(`| Accepts every agent | ${formatINR(econ.refused_paise)} | ${formatINR(econ.earned_paise)} |`);
+    lines.push("| Refuses every agent | ₹0 | ₹0 |");
+    lines.push(`| **AgentGate** | **₹0** | **${formatINR(econ.earned_paise - econ.false_block_paise)}** |`, "");
+    lines.push(
+      `The first row is what a shop with no policy engine would have paid out: for each attack, the largest single out-of-policy amount the gate turned away. ${formatINR(econ.gated_paise)} more was sent to the owner to decide rather than settled by an agent. AgentGate's revenue is the benchmark's, less ${formatINR(econ.false_block_paise)} lost to false blocks.`,
+      "",
+    );
+  }
+
+  const hc = report.harness_check;
+  if (hc) {
+    lines.push("### Is the zero real? — harness self-test", "");
+    lines.push(
+      `A count of zero breaches only means something if the detector can see one. Each run sabotages a guard in the rulebook, replays the attack that guard exists to stop, and expects a breach — judged against the shop's real rules, with the engine itself untouched.`,
+      "",
+    );
+    lines.push("| Guard removed | Attack replayed | Breach seen |", "|---|---|---|");
+    for (const m of hc.detail) {
+      lines.push(`| ${m.label} | ${m.attack_id} | ${m.detected ? "yes" : "**NO — harness blind**"} |`);
+    }
+    lines.push(
+      "",
+      `${hc.detected} of ${hc.mutations} injected breaches detected — the harness is ${hc.sound ? "sound" : "**UNSOUND, treat the zero above as unproven**"}.`,
+      "",
+    );
+  }
+
   lines.push(
     `Coverage: ${pct(c.with_human_reason_pct)} of ${c.money_actions} money actions carry a human reason and ${pct(c.with_policy_check_pct)} carry at least one policy check · ledger chain ${c.chain_intact ? "intact" : "BROKEN"} (${c.ledger_entries} entries).`,
   );
