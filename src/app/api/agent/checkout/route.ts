@@ -16,6 +16,20 @@ export async function POST(req: Request) {
   if (!result.ok) {
     return json({ ok: false, verdict: result.verdict, order: null, ledger_entry_id: result.entry.id }, 409);
   }
+  // The engine allowed it but the provider could not issue a link: nothing was
+  // charged, the refusal is already in the book, and the order can be retried.
+  if (result.payment_error) {
+    return json(
+      {
+        ok: false,
+        error: `The payment provider could not create a link: ${result.payment_error}. Nothing was charged — retry this offer.`,
+        verdict: result.verdict,
+        order: orderView(result.order),
+        ledger_entry_id: result.entry.id,
+      },
+      502,
+    );
+  }
   return json({
     ok: true,
     verdict: result.verdict,

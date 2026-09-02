@@ -38,6 +38,7 @@ export async function POST(req: Request) {
   const body = await parseBody(req, ApprovalRequestSchema);
   if (!body.ok) return body.response;
   const result = await ownerDecision(body.data.order_id, body.data.decision);
-  if (!result.ok) return error(result.error, 409);
+  // A provider outage is retryable (502); a wrong-state order is a conflict (409).
+  if (!result.ok) return error(result.error, result.kind === "provider" ? 502 : 409);
   return json({ ok: true, order: orderView(result.order) });
 }

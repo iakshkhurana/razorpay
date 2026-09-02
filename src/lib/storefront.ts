@@ -21,8 +21,8 @@ import {
 import { newId } from "./ids";
 import { appendEntry, chainSummary, listEntries, recordVerdict } from "./ledger";
 import { formatINR } from "./money";
-import { canTransition, transition } from "./orders/stateMachine";
-import { getPaymentPort, type PaymentEvent, type PaymentHandle } from "./payments";
+import { canTransition, transition, type OrderEvent } from "./orders/stateMachine";
+import { CustomerEmailSchema, getPaymentPort, type PaymentEvent, type PaymentHandle } from "./payments";
 import { computeTotals, evaluate } from "./policy/engine";
 import {
   DEFAULT_POLICY,
@@ -145,11 +145,17 @@ export function upsellPaise(offer: Pick<Offer, "sku_ids" | "qty" | "is_bundle">)
 /* ------------------------------------------------------------------ */
 
 export type CheckoutResult =
-  | { ok: true; verdict: Verdict; order: Order; entry: LedgerEntry; duplicate: boolean }
+  | { ok: true; verdict: Verdict; order: Order; entry: LedgerEntry; duplicate: boolean; payment_error?: string }
   | { ok: false; verdict: Verdict; order: null; entry: LedgerEntry };
 
+/**
+ * A mandate's `user_ref` is free-form — an email, a phone, a nickname. The payment
+ * adapter validates its customer block strictly, so only send an address the same
+ * validator accepts; anything else travels as the name alone.
+ */
 function customerFor(mandate: MandateClaims) {
-  return { name: mandate.user_ref, email: mandate.user_ref.includes("@") ? mandate.user_ref : undefined };
+  const email = CustomerEmailSchema.safeParse(mandate.user_ref);
+  return { name: mandate.user_ref, email: email.success ? email.data : undefined };
 }
 
 function describeOrder(order: Pick<Order, "sku_ids" | "qty">): string {
@@ -263,11 +269,23 @@ export async function checkout(input: { mandate: MandateClaims; offer_id: string
     return { ok: true, verdict, order, entry, duplicate: false };
   }
 
-  order = await issuePaymentLink(order, input.mandate, "link");
-  return { ok: true, verdict, order, entry, duplicate: false };
+  const issued = await issueLinkOrRecord(order, input.mandate, "link");
+  return {
+    ok: true,
+    verdict,
+    order: issued.order,
+    entry,
+    duplicate: false,
+    ...(issued.error ? { payment_error: issued.error } : {}),
+  };
 }
 
-async function issuePaymentLink(order: Order, mandate: MandateClaims, kind: "link" | "fallback"): Promise<Order> {
+async function issuePaymentLink(
+  order: Order,
+  mandate: MandateClaims,
+  kind: "link" | "fallback",
+  event: OrderEvent = kind === "link" ? "PAYMENT_LINK_CREATED" : "FALLBACK_LINK_ISSUED",
+): Promise<Order> {
   const port = getPaymentPort();
   const base = {
     order_id: order.id,
@@ -279,10 +297,38 @@ async function issuePaymentLink(order: Order, mandate: MandateClaims, kind: "lin
   const handle =
     kind === "link" ? await port.createOrder(base) : await port.issueFallbackLink({ ...base, attempt: order.attempts + 1 });
 
-  const status = transition(order.status, kind === "link" ? "PAYMENT_LINK_CREATED" : "FALLBACK_LINK_ISSUED");
-  const withStatus = updateOrder(order.id, { status }) as Order;
+  const withStatus = updateOrder(order.id, { status: transition(order.status, event) }) as Order;
   markNonceUsed(mandate.nonce, mandate.mandate_id);
   return attachPaymentLink(withStatus, handle, mandate.mandate_id, kind);
+}
+
+/**
+ * A provider outage is a money-path event, so it is written down like any other:
+ * the order stays where it was, nothing is charged, and the caller gets a sentence
+ * it can show a human instead of a stack trace.
+ */
+async function issueLinkOrRecord(
+  order: Order,
+  mandate: MandateClaims,
+  kind: "link" | "fallback",
+  event?: OrderEvent,
+): Promise<{ order: Order; error?: string }> {
+  try {
+    return { order: await issuePaymentLink(order, mandate, kind, event) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "the payment provider did not respond";
+    appendEntry({
+      actor: "payments",
+      mandate_id: mandate.mandate_id,
+      action: kind === "link" ? "payment.link_failed" : "payment.fallback_failed",
+      amount_paise: order.amount_paise,
+      verdict: "FAILED",
+      reason_code: kind === "link" ? "PAYMENT_LINK_ERROR" : "FALLBACK_LINK_ERROR",
+      human_reason: `Could not create a payment link: ${message}. Nothing was charged — the order is saved and can be retried.`,
+      policy_checks: [{ rule: "payment_adapter", result: "fail", detail: `${kind} link: ${message}` }],
+    });
+    return { order: getOrder(order.id) ?? order, error: message };
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -415,14 +461,17 @@ export async function reconcileOrder(order_id: string): Promise<{ order: Order; 
 /*  Owner decisions                                                    */
 /* ------------------------------------------------------------------ */
 
-export type OwnerDecisionResult = { ok: true; order: Order } | { ok: false; error: string };
+export type OwnerDecisionResult =
+  | { ok: true; order: Order }
+  /** `provider` means the decision stood but the rails failed — retryable, not a conflict. */
+  | { ok: false; error: string; kind: "state" | "provider" };
 
 export async function ownerDecision(order_id: string, decision: "approve" | "reject"): Promise<OwnerDecisionResult> {
   const order = getOrder(order_id);
-  if (!order) return { ok: false, error: "Order not found." };
+  if (!order) return { ok: false, error: "Order not found.", kind: "state" };
   const event = decision === "approve" ? "OWNER_APPROVED" : "OWNER_REJECTED";
   if (!canTransition(order.status, event)) {
-    return { ok: false, error: `Order is ${order.status}; it is not waiting for the owner.` };
+    return { ok: false, error: `Order is ${order.status}; it is not waiting for the owner.`, kind: "state" };
   }
 
   if (decision === "reject") {
@@ -441,7 +490,7 @@ export async function ownerDecision(order_id: string, decision: "approve" | "rej
   }
 
   const mandate = mandateClaimsForOrder(order);
-  if (!mandate) return { ok: false, error: "Mandate for this order is missing." };
+  if (!mandate) return { ok: false, error: "Mandate for this order is missing.", kind: "state" };
 
   appendEntry({
     actor: "owner",
@@ -454,17 +503,15 @@ export async function ownerDecision(order_id: string, decision: "approve" | "rej
     policy_checks: pass("owner_review", "approved"),
   });
 
-  const port = getPaymentPort();
-  const handle = await port.createOrder({
-    order_id: order.id,
-    amount_paise: order.amount_paise,
-    description: describeOrder(order),
-    idempotency_key: idempotencyKey(order.mandate_id, order.offer_id),
-    customer: customerFor(mandate),
-  });
-  const approved = updateOrder(order.id, { status: transition(order.status, "OWNER_APPROVED") }) as Order;
-  markNonceUsed(mandate.nonce, mandate.mandate_id);
-  return { ok: true, order: attachPaymentLink(approved, handle, mandate.mandate_id, "link") };
+  const issued = await issueLinkOrRecord(order, mandate, "link", "OWNER_APPROVED");
+  if (issued.error) {
+    return {
+      ok: false,
+      error: `Approved, but the payment link could not be created: ${issued.error}. The order stays in your queue — try approving again.`,
+      kind: "provider",
+    };
+  }
+  return { ok: true, order: issued.order };
 }
 
 /* ------------------------------------------------------------------ */

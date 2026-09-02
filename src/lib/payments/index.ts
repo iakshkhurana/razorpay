@@ -37,7 +37,18 @@ export function paymentsMode(): PaymentsMode {
   return "mock";
 }
 
+let override: PaymentPort | null = null;
+
+/**
+ * Test seam: swap in a port that fails on demand so the money path can be
+ * exercised against a provider outage. Pass null to restore the real one.
+ */
+export function setPaymentPortOverride(port: PaymentPort | null): void {
+  override = port;
+}
+
 export function getPaymentPort(): PaymentPort {
+  if (override) return override;
   if (paymentsMode() === "razorpay") {
     if (!process.env.RAZORPAY_WEBHOOK_SECRET && !warnedMissingWebhookSecret) {
       warnedMissingWebhookSecret = true;
