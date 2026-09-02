@@ -133,6 +133,19 @@ export const evalStrings = dict({
     "coverage.openTower": "Control Tower",
     "coverage.openTower.tail": "to read the chain entry by entry.",
 
+    /* live red-team console */
+    "live.title": "Break it yourself",
+    "live.desc": "Fire a real attack from the red team at this running shop. The refusal is stamped by the same engine and written to the same book as every other money action.",
+    "live.pick": "Pick an attack",
+    "live.running": "Firing…",
+    "live.refused": "Refused",
+    "live.breached": "BREACH — money moved against the rulebook",
+    "live.expected": "Written to trip {{code}}",
+    "live.book": "Read it in the book",
+    "live.error": "Could not reach the shop. Check that the app is running and try again.",
+    "live.note": "These are six of the forty attacks the scorecard above measures — same corpus, same breach detector, run live against the app's own database.",
+    "live.empty": "Nothing fired yet. Pick an attack and watch the shop refuse it.",
+
     /* harness self-test */
     "selftest.title": "Is the zero real?",
     "selftest.desc": "A count of zero only means something if the detector can see a breach. Every run sabotages a guard, replays the attack it exists to stop, and expects the alarm.",
@@ -289,6 +302,18 @@ export const evalStrings = dict({
     "coverage.openTower.lead": "श्रृंखला को प्रविष्टि-दर-प्रविष्टि पढ़ने के लिए",
     "coverage.openTower": "कंट्रोल टावर",
     "coverage.openTower.tail": "खोलें।",
+
+    "live.title": "खुद तोड़कर देखिए",
+    "live.desc": "रेड टीम का असली हमला इसी चालू दुकान पर चलाइए। मना करने की मुहर वही इंजन लगाता है और वही बही-खाता उसे लिखता है।",
+    "live.pick": "एक हमला चुनिए",
+    "live.running": "चल रहा है…",
+    "live.refused": "मना किया",
+    "live.breached": "उल्लंघन — नियमों के ख़िलाफ़ पैसा चला",
+    "live.expected": "{{code}} को छूने के लिए लिखा गया",
+    "live.book": "बही-खाते में पढ़िए",
+    "live.error": "दुकान से संपर्क नहीं हुआ। जाँचें कि ऐप चल रहा है और फिर कोशिश करें।",
+    "live.note": "ये ऊपर मापे गए चालीस हमलों में से छह हैं — वही संग्रह, वही उल्लंघन-पकड़, ऐप के अपने डेटाबेस पर लाइव।",
+    "live.empty": "अभी कुछ नहीं चलाया। एक हमला चुनिए और देखिए दुकान कैसे मना करती है।",
 
     "selftest.title": "क्या यह शून्य सच्चा है?",
     "selftest.desc": "शून्य तभी मायने रखता है जब पकड़ने वाला उल्लंघन देख सके। हर रन एक पहरा जान-बूझकर हटाता है, वही हमला दोबारा चलाता है, और अलार्म बजने की उम्मीद करता है।",
