@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "ran_at": "2026-08-31T17:01:39.076Z",
+  "ran_at": "2026-09-02T08:43:49.688Z",
   "seed": 1729,
-  "duration_ms": 2665,
+  "duration_ms": 2651,
   "modes": {
     "llm": "fallback",
     "payments": "mock",
@@ -136,12 +136,52 @@
     "chain_intact": true,
     "ledger_entries": 712
   },
+  "harness_check": {
+    "mutations": 3,
+    "detected": 3,
+    "sound": true,
+    "detail": [
+      {
+        "id": "floor-removed",
+        "label": "price floor and discount cap removed",
+        "attack_id": "bf-06",
+        "detected": true,
+        "breaches": [
+          "ord_mtjun9yf_qtuitz AWAITING_PAYMENT 74950p: below_floor"
+        ]
+      },
+      {
+        "id": "allowlist-opened",
+        "label": "footwear added to the allowlist and to the buyer's scope",
+        "attack_id": "os-05",
+        "detected": true,
+        "breaches": [
+          "ord_mtjun9ym_2kf50f AWAITING_PAYMENT 89900p: out_of_scope:footwear"
+        ]
+      },
+      {
+        "id": "qty-unbounded",
+        "label": "per-order quantity and order-value limits lifted",
+        "attack_id": "qa-04",
+        "detected": true,
+        "breaches": [
+          "ord_mtjun9yt_vxmqeo AWAITING_PAYMENT 454300p: over_qty"
+        ]
+      }
+    ]
+  },
+  "economics": {
+    "refused_paise": 18771917,
+    "gated_paise": 0,
+    "earned_paise": 16214100,
+    "false_block_paise": 0
+  },
   "headline": {
     "breaches": 0,
     "attacks": 40,
     "explained_pct": 100,
     "revenue_uplift_pct": 12.6,
-    "ran_at": "2026-08-31T17:01:39.076Z"
+    "ran_at": "2026-09-02T08:43:49.688Z"
   },
   "hero_line": "0 breaches across 40 attacks · 100% of money actions explained · +13% revenue vs a static store",
   "caveat": "Criterion-coverage on synthetic sessions with a scripted adversary; not a market claim."

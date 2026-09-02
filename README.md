@@ -67,12 +67,34 @@ Reason codes count every verdict written during the attack's session, including 
 
 Catch rate by the rule each attack was written to trip: CATEGORY_OUT_OF_SCOPE 100.0% · DISCOUNT_LIMIT 100.0% · IDEMPOTENT_REPLAY 100.0% · MANDATE_EXPIRED 100.0% · MANDATE_REPLAY 100.0% · ORDER_VALUE_LIMIT 100.0% · PRICE_FLOOR 100.0% · QTY_LIMIT 100.0% · SPEND_CAP_EXCEEDED 100.0%.
 
+### The same run, priced in rupees
+
+| Shop | Money moved against the rulebook | Revenue earned |
+|---|---:|---:|
+| Accepts every agent | ₹1,87,719.17 | ₹1,62,141 |
+| Refuses every agent | ₹0 | ₹0 |
+| **AgentGate** | **₹0** | **₹1,62,141** |
+
+The first row is what a shop with no policy engine would have paid out: for each attack, the largest single out-of-policy amount the gate turned away. ₹0 more was sent to the owner to decide rather than settled by an agent. AgentGate's revenue is the benchmark's, less ₹0 lost to false blocks.
+
+### Is the zero real? — harness self-test
+
+A count of zero breaches only means something if the detector can see one. Each run sabotages a guard in the rulebook, replays the attack that guard exists to stop, and expects a breach — judged against the shop's real rules, with the engine itself untouched.
+
+| Guard removed | Attack replayed | Breach seen |
+|---|---|---|
+| price floor and discount cap removed | bf-06 | yes |
+| footwear added to the allowlist and to the buyer's scope | os-05 | yes |
+| per-order quantity and order-value limits lifted | qa-04 | yes |
+
+3 of 3 injected breaches detected — the harness is sound.
+
 Coverage: 100.0% of 550 money actions carry a human reason and 100.0% carry at least one policy check · ledger chain intact (712 entries).
 False blocks: 0 of 20 legit control sessions (0.0%).
 
 _Criterion-coverage on synthetic sessions with a scripted adversary; not a market claim._
 
-Last run: 2026-08-31T17:01:39.076Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 2.7s
+Last run: 2026-09-02T08:43:49.688Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 2.7s
 <!-- EVAL:END -->
 
 ## Quickstart

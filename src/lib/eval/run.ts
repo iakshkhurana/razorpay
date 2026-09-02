@@ -1,5 +1,5 @@
 import path from "node:path";
-import { dbPath, ledgerCount, listOrders, listSkus, replaceCatalog, resetDatabaseFile, saveEvalRun } from "../db";
+import { dbPath, ledgerCount, listOrders, listSkus, replaceCatalog, resetDatabaseFile, saveEvalRun, setPolicy } from "../db";
 import { newId } from "../ids";
 import { listEntries, parsePolicyChecks, verifyChain } from "../ledger";
 import { scriptedBuyerNext, type BuyerState, type DemoGoal } from "../llm/buyer";
@@ -22,6 +22,7 @@ import {
 } from "../storefront";
 import { ATTACKS, CONTROLS, SKU, breachReasons, type Attack, type ControlSession } from "./attacks";
 import { INTENTS, type Intent } from "./intents";
+import { MUTATIONS, selftestVerdict, type MutationOutcome } from "./selftest";
 import {
   ATTACK_CATEGORIES,
   EVAL_CAVEAT,
@@ -251,6 +252,10 @@ interface AttackOutcome {
   caught: boolean;
   primary_code: string | null;
   breaches: string[];
+  /** largest single out-of-policy amount this attack got refused */
+  refused_paise: number;
+  /** largest single amount this attack sent to the owner instead of the agent */
+  gated_paise: number;
 }
 
 async function runAttack(attack: Attack, now: number, policy: Policy, catalog: Sku[]): Promise<AttackOutcome> {
@@ -305,7 +310,20 @@ async function runAttack(attack: Attack, now: number, policy: Policy, catalog: S
     return reasons.length > 0 ? [`${o.id} ${o.status} ${o.amount_paise}p: ${reasons.join(", ")}`] : [];
   });
 
-  return { attack, reason_codes, caught: primary_code !== null && breaches.length === 0, primary_code, breaches };
+  // One adversary, one attempt: take the biggest amount the gate turned away rather
+  // than summing every counter it wrote along the way.
+  const biggest = (verdicts: readonly string[]) =>
+    rows.filter((e) => verdicts.includes(e.verdict)).reduce((max, e) => Math.max(max, e.amount_paise), 0);
+
+  return {
+    attack,
+    reason_codes,
+    caught: primary_code !== null && breaches.length === 0,
+    primary_code,
+    breaches,
+    refused_paise: biggest(["DENY", "COUNTER"]),
+    gated_paise: biggest(["GATE"]),
+  };
 }
 
 /**
@@ -443,6 +461,34 @@ export async function runEval(opts: RunEvalOptions = {}): Promise<EvalReport> {
     const chain_intact = verifyChain() === null;
     log(`coverage: ${money.length} money actions · ${with_human_reason_pct}% explained · ${with_policy_check_pct}% checked · chain ${chain_intact ? "intact" : "BROKEN"}`);
 
+    /* Harness self-test ------------------------------------------------ */
+    const mutationOutcomes: MutationOutcome[] = [];
+    for (const mutation of MUTATIONS) {
+      const original = ATTACKS.find((a) => a.id === mutation.attack_id);
+      if (!original) continue;
+      const attack = mutation.mutateAttack ? mutation.mutateAttack(original) : original;
+      resetCatalog();
+      setPolicy(mutation.mutate(policy));
+      try {
+        // sabotaged engine, but breaches are still judged against the real rulebook
+        const outcome = await runAttack(attack, NOW_BASE + 3000 + mutationOutcomes.length, policy, pristine);
+        mutationOutcomes.push({
+          id: mutation.id,
+          label: mutation.label,
+          attack_id: mutation.attack_id,
+          detected: outcome.breaches.length > 0,
+          breaches: outcome.breaches,
+        });
+      } finally {
+        setPolicy(policy);
+      }
+    }
+    const selftest = selftestVerdict(mutationOutcomes);
+    for (const m of mutationOutcomes) {
+      log(`self-test ${m.id} (${m.label}): ${m.detected ? "breach seen — detector works" : "NOT DETECTED — harness is blind"}`);
+    }
+    log(`self-test: ${selftest.detected}/${mutationOutcomes.length} injected breaches detected · harness ${selftest.sound ? "sound" : "UNSOUND"}`);
+
     /* Report ---------------------------------------------------------- */
     const uplift = {
       revenue_paise: agentgate.revenue_paise - baseline.revenue_paise,
@@ -486,6 +532,18 @@ export async function runEval(opts: RunEvalOptions = {}): Promise<EvalReport> {
         with_policy_check_pct,
         chain_intact,
         ledger_entries: entries.length,
+      },
+      harness_check: {
+        mutations: mutationOutcomes.length,
+        detected: selftest.detected,
+        sound: selftest.sound,
+        detail: mutationOutcomes,
+      },
+      economics: {
+        refused_paise: outcomes.reduce((acc, o) => acc + o.refused_paise, 0),
+        gated_paise: outcomes.reduce((acc, o) => acc + o.gated_paise, 0),
+        earned_paise: agentgate.revenue_paise,
+        false_block_paise: control_blocked * agentgate.avg_order_paise,
       },
       headline,
       hero_line: heroLine(headline),
