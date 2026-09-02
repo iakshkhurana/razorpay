@@ -33,6 +33,8 @@ A buyer message that tries to talk the seller out of its rules ("ignore your rul
 | `POST` | `/api/mandate/issue` | Demo helper: issues a signed mandate JWT |
 | `GET` | `/api/ledger?view=tech\|shopkeeper` | The book, raw or as one warm sentence per entry |
 | `GET` | `/api/ledger/export` | CSV download of the full chain |
+| `GET` | `/api/ledger/verify?id=` | Audit one row: recomputes its hash from its own contents and re-checks its link to the row before it. Without an `id`, the whole-chain summary. |
+| `GET/POST` | `/api/agent/attack` | The red-team console: list the attacks that can be fired, and fire one at the running shop. Ids only, from a fixed allowlist. |
 | `GET` | `/api/stats` | KPIs, ledger integrity, latest eval headline, active modes |
 | `GET` | `/api/summary?lang=hi\|en` | Two‑sentence spoken day summary |
 | `GET` | `/api/metrics` | Per‑request latency, tokens, tools, estimated cost |

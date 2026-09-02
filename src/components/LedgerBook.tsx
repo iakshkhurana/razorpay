@@ -42,6 +42,46 @@ function shortHash(h: string): string {
   return `${h.slice(0, 6)}…${h.slice(-4)}`;
 }
 
+type EntryCheck = "checking" | "ok" | "broken" | "error";
+
+/**
+ * Audits the row in front of you rather than the whole book: the server
+ * recomputes this entry's hash from its own contents and re-checks its link to
+ * the row before it. A tampered row says so here, in place.
+ */
+function VerifyEntry({ id }: { id: string }) {
+  const [state, setState] = useState<EntryCheck | null>(null);
+
+  const run = async () => {
+    setState("checking");
+    try {
+      const res = await fetch(`/api/ledger/verify?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("verify failed");
+      const data = (await res.json()) as { entry?: { ok?: boolean } };
+      setState(data.entry?.ok ? "ok" : "broken");
+    } catch {
+      setState("error");
+    }
+  };
+
+  const label =
+    state === "checking" ? "checking…" : state === "ok" ? "✓ hash and link check out" : state === "broken" ? "✗ this row was edited" : state === "error" ? "could not check" : "verify this row";
+
+  return (
+    <button
+      type="button"
+      onClick={() => void run()}
+      disabled={state === "checking"}
+      className={cn(
+        "rounded-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/60",
+        state === "ok" ? "text-money" : state === "broken" || state === "error" ? "text-deny" : "text-ink/60",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
 /**
  * The Living Bahi-Khata: an open account book with a maroon spine, ruled lines,
  * entries written in with a slide+fade, amounts right-aligned in mono and every
@@ -125,8 +165,12 @@ export function LedgerBook({ entries, view, emptyText, className, maxHeight = "6
                           ))}
                         </div>
                       ) : null}
-                      <div className="mt-1 text-ink/70">
-                        {shortHash(e.prev_hash)} → {shortHash(e.hash)}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-ink/70">
+                        <span>
+                          {shortHash(e.prev_hash)} → {shortHash(e.hash)}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <VerifyEntry id={e.id} />
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">

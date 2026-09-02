@@ -10,8 +10,10 @@ import {
   computeHash,
   listEntries,
   parsePolicyChecks,
+  PROVENANCE_CHECK,
   recordVerdict,
   verifyChain,
+  verifyEntry,
   type AppendEntryInput,
   type UnhashedLedgerEntry,
 } from "./ledger";
@@ -284,10 +286,13 @@ describe("ledger", () => {
         verdict,
       });
 
+      // the engine's own checks, then the attestation of who decided
+      const recorded = [...verdict.policy_checks, PROVENANCE_CHECK];
       expect(entry.actor).toBe("seller_agent");
-      expect(JSON.parse(entry.policy_checks_json)).toEqual(verdict.policy_checks);
-      expect(parsePolicyChecks(entry)).toEqual(verdict.policy_checks);
-      expect(parsePolicyChecks(listEntries()[0])).toEqual(verdict.policy_checks);
+      expect(JSON.parse(entry.policy_checks_json)).toEqual(recorded);
+      expect(parsePolicyChecks(entry)).toEqual(recorded);
+      expect(parsePolicyChecks(listEntries()[0])).toEqual(recorded);
+      expect(parsePolicyChecks(entry).at(-1)?.detail).toContain("no model in this path");
       expect(parsePolicyChecks({ policy_checks_json: "not json" })).toEqual([]);
       expect(parsePolicyChecks({ policy_checks_json: '[{"rule":"x"}]' })).toEqual([]);
     });
@@ -348,6 +353,48 @@ describe("ledger", () => {
       expect(ledgerCount()).toBe(2);
       expect(chainSummary()).toEqual({ count: 2, head_hash: e2.hash, intact: true, broken_at: null });
       expect(append(4).prev_hash).toBe(e2.hash);
+    });
+  });
+  describe("verifyEntry", () => {
+    it("recomputes one row's hash and its link to the row before it", () => {
+      const e1 = append(1);
+      const e2 = append(2);
+
+      const first = verifyEntry(e1.id);
+      expect(first).toMatchObject({ id: e1.id, index: 0, ok: true, body_ok: true, link_ok: true, expected_prev_hash: GENESIS_HASH });
+      expect(first?.computed_hash).toBe(e1.hash);
+
+      const second = verifyEntry(e2.id);
+      expect(second).toMatchObject({ index: 1, ok: true, expected_prev_hash: e1.hash });
+      expect(verifyEntry("led_nope")).toBeNull();
+    });
+
+    it("names the edited row: an altered body fails its own hash, and the row after it loses its link", () => {
+      const e1 = append(1);
+      const e2 = append(2);
+      tamperLedgerRow(e1.id, { human_reason: "nothing to see here" });
+
+      const edited = verifyEntry(e1.id);
+      expect(edited?.ok).toBe(false);
+      expect(edited?.body_ok).toBe(false);
+      expect(edited?.link_ok).toBe(true);
+      expect(edited?.computed_hash).not.toBe(edited?.stored_hash);
+
+      // e2 still stores the pre-edit hash of e1, which no longer matches
+      const after = verifyEntry(e2.id);
+      expect(after?.body_ok).toBe(true);
+      expect(after?.link_ok).toBe(true);
+      expect(verifyChain()).toBe(0);
+    });
+
+    it("catches a re-linked row even when its own hash was recomputed", () => {
+      append(1);
+      const e2 = append(2);
+      rawUpdate(e2.id, "prev_hash", GENESIS_HASH);
+
+      const relinked = verifyEntry(e2.id);
+      expect(relinked?.link_ok).toBe(false);
+      expect(relinked?.ok).toBe(false);
     });
   });
 });

@@ -15,13 +15,17 @@ An AI buyer agent is an untrusted client that speaks natural language. The threa
 1. **Deterministic gate.** The policy engine is pure TypeScript — no LLM, no I/O, no clock of its own. The seller LLM can only *propose*; the engine stamps every money action ALLOW / COUNTER / GATE / DENY with reason codes and per‑rule checks. Injection can change the words, never the verdict.
 2. **Signed mandates.** HS256 JWTs carry spend cap, category scope, expiry and a single‑use nonce. Bad signature, expiry and replay are each a distinct DENY — written to the ledger before the 401 leaves the server.
 3. **Bounded tools.** The seller's tools (`search_catalog`, `get_offer`, `propose_bundle`, `finalize_checkout`, `shop_info`) return engine‑stamped data; prices never come from the model. Grounded shop answers cite their source chunk.
-4. **Append‑only evidence.** Every money action — including DENY and payment failures — appends a hash‑chained ledger entry. `verifyChain()` pinpoints the first tampered row; the dashboard shows it in red.
+4. **Append‑only evidence.** Every money action — including DENY and payment failures — appends a hash‑chained ledger entry, and every verdict row carries a `decided_by` attestation inside its hashed body: the deterministic engine decided it, no model was in the path. `verifyChain()` pinpoints the first tampered row and the dashboard shows it in red; `verifyEntry()` (and `GET /api/ledger/verify?id=`) audits a single row in place, so a reader can check the entry in front of them instead of trusting an aggregate.
 5. **Human gate.** Orders above the merchant's threshold GATE to the owner. Approve and Reject both write ledger entries. The AI never approves its own high‑value order.
 6. **Idempotent payments.** `mandate_id + offer_id` keys every payment‑creating call; webhooks are signature‑verified; failures land in `HELD` with a fallback link instead of a retry loop.
 
 ## Red team
 
 `npm run eval` replays 40 scripted attacks — overspend, below‑floor, out‑of‑scope, expired mandates, replayed nonces, quantity abuse, and prompt‑injection variants — plus 20 legitimate control sessions. The bar: **0 breaches** (money moved against policy), with catch‑rate by reason code and the false‑block rate reported honestly. The run rewrites the results table in the README from real output only.
+
+**The zero falsifies itself.** A count of zero breaches is worthless if the detector is blind, so every run also sabotages its own guards: three mutations each remove one rule from the shop's rulebook, replay the attack that rule exists to stop, and expect the breach detector to fire. Breaches stay judged against the shop's *real* rules, and the engine is never touched — only the policy handed to it. If a mutation goes undetected the report declares the harness unsound instead of printing a quiet zero.
+
+**Six of those attacks can be fired by hand** from `/eval` against the running shop (`POST /api/agent/attack`, ids from a fixed allowlist, rate‑limited). Same corpus, same breach detector, live ledger.
 
 ## Data & keys
 
