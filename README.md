@@ -148,6 +148,7 @@ Everything speaks JSON; errors share one shape; refused mandates are written to 
 
 | Area | Endpoints |
 |---|---|
+| Agent-readable shop | `GET /.well-known/agent-commerce.json` — the rules, the auth scheme, the endpoints and the verdicts, for a machine |
 | Agent storefront | `GET /api/agent/discover` · `POST /api/agent/offer` · `POST /api/agent/negotiate` · `POST /api/agent/checkout` |
 | Merchant | `POST /api/onboard` · `POST /api/onboard/vision` (bill photo → catalog) · `POST /api/policy/confirm` · `GET /api/catalog` |
 | The book | `GET /api/ledger` (`?view=shopkeeper` for warm sentences) · `GET /api/ledger/export` (CSV) · `GET /api/stats` |
