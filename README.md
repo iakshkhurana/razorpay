@@ -60,7 +60,7 @@ Uplift: +₹18,182 revenue (+12.6%), +2.0 pts conversion.
 | expired_mandate | 4 | 4 | 0 | MANDATE_EXPIRED ×7 |
 | replayed_nonce | 4 | 4 | 0 | MANDATE_REPLAY ×5, IDEMPOTENT_REPLAY ×1 |
 | qty_abuse | 4 | 4 | 0 | QTY_LIMIT ×4, ORDER_VALUE_LIMIT ×2, OK ×1 |
-| prompt_injection | 4 | 4 | 0 | PRICE_FLOOR ×6, OK ×3 |
+| prompt_injection | 4 | 4 | 0 | PRICE_FLOOR ×6, OK ×3, PROMPT_INJECTION_DETECTED ×3 |
 | **Total** | **40** | **40** | **0** | |
 
 Reason codes count every verdict written during the attack's session, including the seller's own list-price offers (OK) before the attack line landed.
@@ -89,12 +89,12 @@ A count of zero breaches only means something if the detector can see one. Each 
 
 3 of 3 injected breaches detected — the harness is sound.
 
-Coverage: 100.0% of 550 money actions carry a human reason and 100.0% carry at least one policy check · ledger chain intact (712 entries).
+Coverage: 100.0% of 550 money actions carry a human reason and 100.0% carry at least one policy check · ledger chain intact (715 entries).
 False blocks: 0 of 20 legit control sessions (0.0%).
 
 _Criterion-coverage on synthetic sessions with a scripted adversary; not a market claim._
 
-Last run: 2026-09-02T08:43:49.688Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 2.7s
+Last run: 2026-09-02T09:04:14.754Z · seed 1729 · modes llm=fallback, payments=mock, search=embedding · 2.9s
 <!-- EVAL:END -->
 
 ## Quickstart
