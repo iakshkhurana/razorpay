@@ -49,6 +49,8 @@ export const nav = dict({
     /* drawers */
     "drawer.open": "Open navigation",
     "drawer.close": "Close navigation",
+    "sidebar.collapse": "Collapse sidebar",
+    "sidebar.expand": "Expand sidebar",
 
     /* brand link */
     "brand.home": "AgentGate — home",
@@ -93,6 +95,8 @@ export const nav = dict({
 
     "drawer.open": "नेविगेशन खोलें",
     "drawer.close": "नेविगेशन बंद करें",
+    "sidebar.collapse": "साइडबार समेटें",
+    "sidebar.expand": "साइडबार खोलें",
 
     "brand.home": "AgentGate — होम",
 

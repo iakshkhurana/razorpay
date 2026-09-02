@@ -87,7 +87,6 @@ function makeFriendlyCase(rand: () => number): Case {
   return {
     action: { ...draft, proposed_total_paise: total },
     mandate: {
-      mandate_id: "mnd_prop",
       agent_id: "prop-agent",
       user_ref: "prop@example.com",
       spend_cap_paise: Math.max(1, bound(total)),
@@ -124,7 +123,6 @@ function makeCase(rand: () => number): Case {
     refund_policy: "7-day easy returns.",
   };
   const mandate: Mandate = {
-    mandate_id: "mnd_prop",
     agent_id: "prop-agent",
     user_ref: "prop@example.com",
     spend_cap_paise: 1 + Math.floor(rand() * 1_500_000),
