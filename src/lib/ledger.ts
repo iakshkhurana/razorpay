@@ -143,6 +143,17 @@ export const RecordVerdictInputSchema = z.object({
 });
 export type RecordVerdictInput = z.input<typeof RecordVerdictInputSchema>;
 
+/**
+ * "The model never touches money" is an architectural claim. This puts it in the
+ * record: every verdict row states, inside the hashed body, which component
+ * decided it. Tampering with the attestation breaks the chain like any other edit.
+ */
+export const PROVENANCE_CHECK: PolicyCheck = Object.freeze({
+  rule: "decided_by",
+  result: "pass",
+  detail: "deterministic policy engine — pure function, no model in this path",
+});
+
 /** Writes a policy verdict as-is — ALLOW, COUNTER, GATE and DENY all land in the book. */
 export function recordVerdict(input: RecordVerdictInput): LedgerEntry {
   const valid = RecordVerdictInputSchema.parse(input);
@@ -154,10 +165,56 @@ export function recordVerdict(input: RecordVerdictInput): LedgerEntry {
     verdict: valid.verdict.decision,
     reason_code: valid.verdict.reason_code,
     human_reason: valid.verdict.human_reason,
-    policy_checks: valid.verdict.policy_checks,
+    policy_checks: [...valid.verdict.policy_checks, PROVENANCE_CHECK],
     ts: valid.ts,
     id: valid.id,
   });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Per-entry verification                                             */
+/* ------------------------------------------------------------------ */
+
+export interface EntryVerification {
+  id: string;
+  /** 0-based position in insertion order */
+  index: number;
+  ok: boolean;
+  /** the row's own hash recomputes from its contents */
+  body_ok: boolean;
+  /** the row links to the hash of the row before it */
+  link_ok: boolean;
+  stored_hash: string;
+  computed_hash: string;
+  prev_hash: string;
+  expected_prev_hash: string;
+}
+
+/**
+ * Verifies one row rather than the whole book: recomputes its hash from its own
+ * contents and checks that it links to its predecessor. Lets a reader audit the
+ * single entry in front of them instead of trusting an aggregate badge.
+ */
+export function verifyEntry(id: string): EntryVerification | null {
+  const rows = listLedgerRows({ order: "asc" });
+  const index = rows.findIndex((r) => r.id === id);
+  if (index === -1) return null;
+  const row = rows[index];
+  const expected_prev_hash = index === 0 ? GENESIS_HASH : rows[index - 1].hash;
+  const computed_hash = computeHash(row);
+  const body_ok = computed_hash === row.hash;
+  const link_ok = row.prev_hash === expected_prev_hash;
+  return {
+    id: row.id,
+    index,
+    ok: body_ok && link_ok,
+    body_ok,
+    link_ok,
+    stored_hash: row.hash,
+    computed_hash,
+    prev_hash: row.prev_hash,
+    expected_prev_hash,
+  };
 }
 
 /* ------------------------------------------------------------------ */
