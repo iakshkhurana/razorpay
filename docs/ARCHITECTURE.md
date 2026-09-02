@@ -58,6 +58,8 @@ The seller LLM negotiates, upsells and explains — but prices, discounts and av
 
 Counters carry exact paise math; every verdict carries `reason_code`, a `human_reason`, and the full list of `policy_checks`.
 
+Because `evaluate` is pure, it can be checked by property rather than by example. Alongside the per-rule unit tests, 5,000 seeded random cases assert the two properties the product rests on: an **ALLOW** means every bound holds (re-derived from the inputs, not from the engine), and **every** verdict carries a reason code, a human sentence and at least one policy check. Two more assert the structural claims: the engine mutates nothing it is handed, and the same inputs always yield the same verdict. Roughly 40% of generated cases sit exactly on a bound, where an off-by-one would either block a legitimate sale or let one through.
+
 ## Ledger
 
 Every money action — allowed, countered, gated, denied, failed — appends an entry. Each entry's hash covers its canonical JSON plus the previous hash; genesis uses 64 zeros. Tampering with any row breaks every hash after it, which the Control Tower surfaces as a red integrity badge with the broken index.
